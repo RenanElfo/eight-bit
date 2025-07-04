@@ -1,3 +1,5 @@
+mod serialize; use serialize::duty_cycle;
+
 fn main() {
-    println!("Hello, world!");
+    println!("{}", duty_cycle(0.0));
 }
