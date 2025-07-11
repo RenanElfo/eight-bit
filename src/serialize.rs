@@ -7,8 +7,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_edge_cases() {
-        assert_eq!(duty_cycle(-0.000001_f64), 0_u8);
+    fn test_duty_cycle_edge_cases() {
+        assert_eq!(duty_cycle(-1.0000000000000002_f64), 0_u8);
         assert_eq!(duty_cycle(1.0000000000000002_f64), 255_u8);
     }
 
