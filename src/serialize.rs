@@ -1,5 +1,5 @@
 pub fn duty_cycle(f: f64) -> u8 {
-    return (f.clamp(0.0, 1.0)*255.0).ceil() as u8
+    return (f.clamp(0.0, 1.0) * 255.0).ceil() as u8;
 }
 
 #[cfg(test)]
