@@ -1,14 +1,16 @@
-use std::result::Result;
-use std::ops::Sub;
 use std::ops::Div;
+use std::ops::Sub;
+use std::result::Result;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Wave {
-    values: Vec<i8>,
+    values: Vec<i16>,
+    amplitude: f64,
+    sampling_frequency: f64,
 }
 
 impl Wave {
-    pub fn new(values: Vec<i8>) -> Self {
+    pub fn new(values: Vec<i16>) -> Self {
         return Wave { values };
     }
 
@@ -26,8 +28,13 @@ impl Wave {
         return Ok(Wave::new(vec![0]));
     }
 
-    pub fn sample_left_pad(self, ammount: i32) -> Self {
-        return Wave::new(vec![ammount as i8]);
+    pub fn sample_right_pad(&mut self, ammount: usize) {
+        self.values.resize(self.values.len() + ammount, 0);
+    }
+
+    pub fn sample_left_pad(&mut self, ammount: usize) {
+        self.sample_right_pad(ammount);
+        self.values.rotate_right(ammount);
     }
 }
 
@@ -56,10 +63,7 @@ mod tests {
         let x: Wave = Wave::new(vec![1, 2, 3]);
         let y: Wave = Wave::new(vec![4, 5, 6]);
         let z = x.merge(&y);
-        assert_eq!(
-            z,
-            Wave::new(vec![1, 2, 3, 4, 5, 6])
-        );
+        assert_eq!(z, Wave::new(vec![1, 2, 3, 4, 5, 6]));
         let w = x - y;
         assert_eq!(z, w);
     }
@@ -73,5 +77,18 @@ mod tests {
         let w = x / y;
         assert_eq!(z, w.unwrap());
     }
-}
 
+    #[test]
+    fn test_right_padding() {
+        let mut x: Wave = Wave::new(vec![1, 2, 3]);
+        x.sample_right_pad(2);
+        assert_eq!(x, Wave::new(vec![1, 2, 3, 0, 0]));
+    }
+
+    #[test]
+    fn test_left_padding() {
+        let mut x: Wave = Wave::new(vec![1, 2, 3]);
+        x.sample_left_pad(2);
+        assert_eq!(x, Wave::new(vec![0, 0, 1, 2, 3]));
+    }
+}
