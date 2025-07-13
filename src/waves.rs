@@ -1,22 +1,40 @@
+use std::default::Default;
 use std::ops::Div;
 use std::ops::Sub;
 use std::result::Result;
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Wave {
     values: Vec<i16>,
     amplitude: f64,
     sampling_frequency: f64,
 }
 
+impl Default for Wave {
+    fn default() -> Self {
+        return Wave {
+            values: Vec::default(),
+            amplitude: 1_f64,
+            sampling_frequency: 44100_f64,
+        };
+    }
+}
+
 impl Wave {
-    pub fn new(values: Vec<i16>) -> Self {
-        return Wave { values };
+    pub fn new(values: Vec<i16>, amplitude: f64, sampling_frequency: f64) -> Self {
+        return Wave {
+            values,
+            amplitude,
+            sampling_frequency,
+        };
     }
 
-    pub fn merge(&self, other: &Self) -> Self {
+    pub fn merge(&self, other: &Self) -> Result<Self, &'static str> {
+        if self.sampling_frequency != other.sampling_frequency {
+            return Err("Can't merge waves with different sampling frequencies");
+        }
         let new_values = [&self.values[..], &other.values[..]].concat();
-        return Wave::new(new_values);
+        return Ok(Wave::new(new_values, 1_f64, self.sampling_frequency));
     }
 
     pub fn overlap(&self, other: &Self) -> Result<Self, &'static str> {
@@ -25,7 +43,7 @@ impl Wave {
         if len_self != len_other {
             return Err("values don't have the same length");
         }
-        return Ok(Wave::new(vec![0]));
+        return Ok(Wave::new(vec![0], 1_f64, 44100_f64));
     }
 
     pub fn sample_right_pad(&mut self, ammount: usize) {
@@ -39,7 +57,7 @@ impl Wave {
 }
 
 impl Sub for Wave {
-    type Output = Self;
+    type Output = Result<Self, &'static str>;
 
     fn sub(self, other: Self) -> Self::Output {
         return self.merge(&other);
@@ -59,36 +77,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_default() {
+        let x: Wave = Wave::default();
+        let y: Wave = Wave {
+            values: vec![],
+            amplitude: 1_f64,
+            sampling_frequency: 44100_f64,
+        };
+        assert_eq!(x, y);
+    }
+
+    #[test]
     fn test_concatenation() {
-        let x: Wave = Wave::new(vec![1, 2, 3]);
-        let y: Wave = Wave::new(vec![4, 5, 6]);
-        let z = x.merge(&y);
-        assert_eq!(z, Wave::new(vec![1, 2, 3, 4, 5, 6]));
-        let w = x - y;
+        let x: Wave = Wave::new(vec![1, 2, 3], 1_f64, 44100_f64);
+        let y: Wave = Wave::new(vec![4, 5, 6], 1_f64, 44100_f64);
+        let z = x.merge(&y).unwrap();
+        assert_eq!(z, Wave::new(vec![1, 2, 3, 4, 5, 6], 1_f64, 44100_f64));
+        let w = (x - y).unwrap();
         assert_eq!(z, w);
     }
 
     #[test]
     fn test_overlapping() {
-        let x: Wave = Wave::new(vec![0]);
-        let y: Wave = Wave::new(vec![0]);
+        let x: Wave = Wave::new(vec![0], 1_f64, 44100_f64);
+        let y: Wave = Wave::new(vec![0], 1_f64, 44100_f64);
         let z: Wave = x.overlap(&y).unwrap();
-        assert_eq!(z, Wave::new(vec![0]));
+        assert_eq!(z, Wave::new(vec![0], 1_f64, 44100_f64));
         let w = x / y;
         assert_eq!(z, w.unwrap());
     }
 
     #[test]
     fn test_right_padding() {
-        let mut x: Wave = Wave::new(vec![1, 2, 3]);
+        let mut x: Wave = Wave::new(vec![1, 2, 3], 1_f64, 44100_f64);
         x.sample_right_pad(2);
-        assert_eq!(x, Wave::new(vec![1, 2, 3, 0, 0]));
+        assert_eq!(x, Wave::new(vec![1, 2, 3, 0, 0], 1_f64, 44100_f64));
     }
 
     #[test]
     fn test_left_padding() {
-        let mut x: Wave = Wave::new(vec![1, 2, 3]);
+        let mut x: Wave = Wave::new(vec![1, 2, 3], 1_f64, 44100_f64);
         x.sample_left_pad(2);
-        assert_eq!(x, Wave::new(vec![0, 0, 1, 2, 3]));
+        assert_eq!(x, Wave::new(vec![0, 0, 1, 2, 3], 1_f64, 44100_f64));
     }
 }
