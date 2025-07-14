@@ -3,6 +3,9 @@ use std::ops::Div;
 use std::ops::Sub;
 use std::result::Result;
 
+const DEFAULT_AMPLITUDE: f64 = 1_f64;
+const DEFAULT_SAMPLING_FREQUENCY: f64 = 44100_f64;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Wave {
     values: Vec<i16>,
@@ -14,8 +17,8 @@ impl Default for Wave {
     fn default() -> Self {
         return Wave {
             values: Vec::default(),
-            amplitude: 1_f64,
-            sampling_frequency: 44100_f64,
+            amplitude: DEFAULT_AMPLITUDE,
+            sampling_frequency: DEFAULT_SAMPLING_FREQUENCY,
         };
     }
 }
@@ -27,6 +30,22 @@ impl Wave {
             amplitude,
             sampling_frequency,
         };
+    }
+
+    pub fn with_length(mut self, length: usize) -> Self {
+        self.values = vec![0; length];
+        self.amplitude = 0_f64;
+        return self;
+    }
+
+    pub fn with_amplitude(mut self, amplitude: f64) -> Self {
+        self.amplitude = amplitude;
+        return self;
+    }
+
+    pub fn with_sampling_frequency(mut self, sampling_frequency: f64) -> Self {
+        self.sampling_frequency = sampling_frequency;
+        return self;
     }
 
     pub fn merge(&self, other: &Self) -> Result<Self, &'static str> {
@@ -72,6 +91,14 @@ impl Wave {
     pub fn milliseconds_to_samples(&self, time_interval: f64) -> usize {
         return ((time_interval / 1000_f64) * self.sampling_frequency) as usize;
     }
+
+    pub fn sample_length(&self) -> usize {
+        return self.values.len();
+    }
+
+    pub fn milliseconds_length(&self) -> f64 {
+        return self.samples_to_milliseconds(self.sample_length());
+    }
 }
 
 impl Sub for Wave {
@@ -103,6 +130,19 @@ mod tests {
             sampling_frequency: 44100_f64,
         };
         assert_eq!(x, y);
+    }
+
+    #[test]
+    fn test_builder_functions() {
+        let amplitude = 2_f64;
+        let sampling_frequency = 8192_f64;
+        let x: Wave = Wave::default()
+            .with_length(3)
+            .with_amplitude(2_f64)
+            .with_sampling_frequency(8192_f64);
+        assert_eq!(x.values, vec![0, 0, 0]);
+        assert_eq!(x.amplitude, amplitude);
+        assert_eq!(x.sampling_frequency, sampling_frequency);
     }
 
     #[test]
