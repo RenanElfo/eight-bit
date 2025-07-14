@@ -50,9 +50,27 @@ impl Wave {
         self.values.resize(self.values.len() + ammount, 0);
     }
 
+    pub fn milliseconds_right_pad(&mut self, time_interval: f64) {
+        let ammount = self.milliseconds_to_samples(time_interval);
+        self.sample_right_pad(ammount);
+    }
+
     pub fn sample_left_pad(&mut self, ammount: usize) {
         self.sample_right_pad(ammount);
         self.values.rotate_right(ammount);
+    }
+
+    pub fn milliseconds_left_pad(&mut self, time_interval: f64) {
+        let ammount = self.milliseconds_to_samples(time_interval);
+        self.sample_left_pad(ammount);
+    }
+
+    pub fn samples_to_milliseconds(&self, ammount: usize) -> f64 {
+        return (ammount as f64) * 1000_f64 / self.sampling_frequency;
+    }
+
+    pub fn milliseconds_to_samples(&self, time_interval: f64) -> usize {
+        return ((time_interval / 1000_f64) * self.sampling_frequency) as usize;
     }
 }
 
@@ -108,16 +126,32 @@ mod tests {
     }
 
     #[test]
-    fn test_right_padding() {
+    fn test_sample_right_padding() {
         let mut x: Wave = Wave::new(vec![1, 2, 3], 1_f64, 44100_f64);
         x.sample_right_pad(2);
         assert_eq!(x, Wave::new(vec![1, 2, 3, 0, 0], 1_f64, 44100_f64));
     }
 
     #[test]
-    fn test_left_padding() {
+    fn test_milliseconds_right_padding() {
+        let mut x: Wave = Wave::new(vec![1], 1_f64, 44100_f64);
+        x.milliseconds_right_pad(1000_f64);
+        assert_eq!(x.values.first().unwrap(), &1);
+        assert_eq!(x.values.len(), 44101);
+    }
+
+    #[test]
+    fn test_sample_left_padding() {
         let mut x: Wave = Wave::new(vec![1, 2, 3], 1_f64, 44100_f64);
         x.sample_left_pad(2);
         assert_eq!(x, Wave::new(vec![0, 0, 1, 2, 3], 1_f64, 44100_f64));
+    }
+
+    #[test]
+    fn test_milliseconds_left_padding() {
+        let mut x: Wave = Wave::new(vec![1], 1_f64, 44100_f64);
+        x.milliseconds_left_pad(1000_f64);
+        assert_eq!(x.values.last().unwrap(), &1);
+        assert_eq!(x.values.len(), 44101);
     }
 }
