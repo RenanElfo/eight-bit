@@ -1,71 +1,94 @@
+use std::convert::{Into, TryFrom};
 use std::default::Default;
 
-const A_FREQUENCY: f64 = 440_f64;
-const LOWER_FREQUENCY_THRESHOLD: f64 = 20_f64;
-const UPPER_FREQUENCY_THRESHOLD: f64 = 20_000_f64;
-const LOWEST_NOTE: f64 = get_first_note(LOWER_FREQUENCY_THRESHOLD);
-const SEMI_TONE_FACTOR: f64 = f64::from_bits(4607450216769616227);
-const NUMBER_OF_AVAILABLE_NOTES: usize = get_size(UPPER_FREQUENCY_THRESHOLD);
-pub const AVAILABLE_NOTES: [f64; NUMBER_OF_AVAILABLE_NOTES] = generate_array();
+use crate::standard_notes::*;
 
-const fn get_first_note(lower_frequency_threshold: f64) -> f64 {
-    let mut frequency: f64 = A_FREQUENCY;
-    while frequency > lower_frequency_threshold {
-        frequency /= SEMI_TONE_FACTOR;
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AvailableNote<const MAX_SIZE: usize> {
+    index: usize,
+}
+
+impl TryFrom<usize> for AvailableNote<NUMBER_OF_AVAILABLE_NOTES> {
+    type Error = &'static str;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        if value >= NUMBER_OF_AVAILABLE_NOTES {
+            return Err("Passed usize value is larger than maximum allowed.");
+        }
+        return Ok(AvailableNote { index: value });
     }
-    return frequency * SEMI_TONE_FACTOR;
 }
 
-const fn get_size(upper_frequency_threshold: f64) -> usize {
-    let mut frequency: f64 = LOWEST_NOTE;
-    let mut counter = 0;
-    while frequency < upper_frequency_threshold {
-        frequency *= SEMI_TONE_FACTOR;
-        counter += 1;
+impl Into<f64> for AvailableNote<NUMBER_OF_AVAILABLE_NOTES> {
+    fn into(self: Self) -> f64 {
+        return AVAILABLE_NOTES[self.index];
     }
-    return counter;
 }
 
-const fn generate_array() -> [f64; NUMBER_OF_AVAILABLE_NOTES] {
-    let mut array = [0_f64; NUMBER_OF_AVAILABLE_NOTES];
-    array[0] = LOWEST_NOTE;
-    let mut index: usize = 0;
-    while index < NUMBER_OF_AVAILABLE_NOTES - 1 {
-        index += 1;
-        array[index] = array[index - 1] * SEMI_TONE_FACTOR;
+impl Into<Frequency> for AvailableNote<NUMBER_OF_AVAILABLE_NOTES> {
+    fn into(self: Self) -> Frequency {
+        let frequency: f64 = self.into();
+        return Frequency::try_from(frequency).unwrap();
     }
-    return array;
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Pitch {
-    Frequency(f64),
-    Key(u8),
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Frequency {
+    value: f64,
 }
 
-impl Default for Pitch {
+impl TryFrom<f64> for Frequency {
+    type Error = &'static str;
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        if value < 0_f64 {
+            return Err("Frequency value must be non-negative.");
+        }
+        return Ok(Frequency { value });
+    }
+}
+
+impl Into<f64> for Frequency {
+    fn into(self: Self) -> f64 {
+        return self.value;
+    }
+}
+
+impl Into<AvailableNote<NUMBER_OF_AVAILABLE_NOTES>> for Frequency {
+    fn into(self: Self) -> AvailableNote<NUMBER_OF_AVAILABLE_NOTES> {
+        todo!();
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Tone<const MAX_SIZE: usize> {
+    Pitch(Frequency),
+    Note(AvailableNote<MAX_SIZE>),
+}
+
+impl Default for Tone<NUMBER_OF_AVAILABLE_NOTES> {
     fn default() -> Self {
-        return Pitch::Frequency(440_f64);
+        return Tone::Pitch(Frequency::try_from(440_f64).unwrap());
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Note {
-    pitch: Pitch,
-    duration: f64,
-}
-
-impl Note {
-    pub fn with_pitch(mut self, pitch: Pitch) -> Self {
-        self.pitch = pitch;
-        return self;
-    }
-
-    pub fn with_duration(mut self, duration: f64) -> Self {
-        self.duration = duration;
-        return self;
-    }
-}
+// #[derive(Clone, Copy, Debug, Default, PartialEq)]
+// pub struct Sound {
+//     pitch: Tone<NUMBER_OF_AVAILABLE_NOTES>,
+//     duration: f64,
+// }
+//
+// impl Sound {
+//     pub fn with_pitch(mut self, pitch: Tone<NUMBER_OF_AVAILABLE_NOTES>) -> Self {
+//         self.pitch = pitch;
+//         return self;
+//     }
+//
+//     pub fn with_duration(mut self, duration: f64) -> Self {
+//         self.duration = duration;
+//         return self;
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -76,12 +99,32 @@ mod tests {
 
     #[test]
     fn test_enum() {
-        let x: Pitch = Pitch::Frequency(A_FREQUENCY);
+        let x: Tone<NUMBER_OF_AVAILABLE_NOTES> =
+            Tone::Pitch(Frequency::try_from(A_FREQUENCY).unwrap());
         let mut y: f64 = 0_f64;
-        if let Pitch::Frequency(value) = x {
-            y = value.clone();
-            assert_eq!(value, A_FREQUENCY);
+        if let Tone::Pitch(value) = x {
+            y = value.into();
+            assert_eq!(value, Frequency::try_from(A_FREQUENCY).unwrap());
         }
         assert_eq!(y, A_FREQUENCY);
+        assert_eq!(x, Tone::default());
+    }
+
+    #[test]
+    fn test_available_note_conversions() {
+        let x: AvailableNote<NUMBER_OF_AVAILABLE_NOTES> =
+            AvailableNote::try_from(0 as usize).unwrap();
+        let y: f64 = x.into();
+        assert_eq!(y, LOWEST_NOTE);
+        let x = AvailableNote::try_from(NUMBER_OF_AVAILABLE_NOTES);
+        match x {
+            Ok(value) => {
+                panic!(
+                    "Expected an error, got AvailableNote with value {}",
+                    value.index
+                )
+            }
+            Err(_error) => {}
+        }
     }
 }
