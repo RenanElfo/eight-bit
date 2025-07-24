@@ -1,4 +1,4 @@
-use std::convert::{Into, TryFrom};
+use std::convert::{TryFrom, TryInto};
 use std::default::Default;
 
 use crate::standard_notes::*;
@@ -54,9 +54,23 @@ impl Into<f64> for Frequency {
     }
 }
 
-impl Into<AvailableNote<NUMBER_OF_AVAILABLE_NOTES>> for Frequency {
-    fn into(self: Self) -> AvailableNote<NUMBER_OF_AVAILABLE_NOTES> {
-        todo!();
+impl TryInto<AvailableNote<NUMBER_OF_AVAILABLE_NOTES>> for Frequency {
+    type Error = &'static str;
+
+    fn try_into(self: Self) -> Result<AvailableNote<NUMBER_OF_AVAILABLE_NOTES>, Self::Error> {
+        let possible_notes_indices = AVAILABLE_NOTES
+            .into_iter()
+            .enumerate()
+            .filter(|(_index, note)| {
+                let distance = (note - self.value).abs();
+                return distance < LOWEST_NOTE;
+            })
+            .map(|(index, _note)| index)
+            .nth(0);
+        match possible_notes_indices {
+            Some(index) => return AvailableNote::try_from(index),
+            None => return Err("Hello World"),
+        }
     }
 }
 
@@ -126,5 +140,26 @@ mod tests {
             }
             Err(_error) => {}
         }
+    }
+
+    #[test]
+    fn test_frequency_to_available_note() {
+        let tolerance: f64 = 0.01;
+
+        let freq: Frequency = Frequency::try_from(A_FREQUENCY + 2_f64).unwrap();
+        let note: AvailableNote<NUMBER_OF_AVAILABLE_NOTES> = freq.try_into().unwrap();
+        let freq_reconverted = TryInto::<f64>::try_into(note).unwrap();
+        assert!(
+            freq_reconverted - tolerance < A_FREQUENCY
+                && freq_reconverted + tolerance > A_FREQUENCY
+        );
+
+        let freq: Frequency = Frequency::try_from(A_FREQUENCY*SEMI_TONE_FACTOR).unwrap();
+        let note: AvailableNote<NUMBER_OF_AVAILABLE_NOTES> = freq.try_into().unwrap();
+        let freq_reconverted = TryInto::<f64>::try_into(note).unwrap();
+        assert!(
+            freq_reconverted - tolerance > A_FREQUENCY
+                || freq_reconverted + tolerance < A_FREQUENCY
+        );
     }
 }
