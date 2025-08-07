@@ -7,6 +7,8 @@ const DEFAULT_SAMPLING_FREQUENCY: f64 = 44100_f64;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum InvalidAudioKind {
+    NanSamples,
+    InfiniteValuedSamples,
     NegativeSamplingFrequency,
     MismatchedSamplingFrequency,
     MismatchedLength,
@@ -51,17 +53,33 @@ impl AudioBuilder {
         return self;
     }
 
-    pub fn validate(&self) -> Result<(), InvalidAudio> {
+    pub fn validate(&self) -> Result<(), Vec<InvalidAudio>> {
+        let mut possible_errors: Vec<InvalidAudio> = vec![];
         if self.sampling_frequency < 0.0 {
-            return Err(InvalidAudio {
+            possible_errors.push(InvalidAudio {
                 kind: InvalidAudioKind::NegativeSamplingFrequency,
             });
+        }
+        if self.samples.iter().any(|sample| sample.is_nan()) {
+            possible_errors.push(InvalidAudio {
+                kind: InvalidAudioKind::NanSamples,
+            });
+        }
+        if self.samples.iter().any(|sample| sample.is_infinite()) {
+            possible_errors.push(InvalidAudio {
+                kind: InvalidAudioKind::InfiniteValuedSamples,
+            });
+        }
+        if !possible_errors.is_empty() {
+            return Err(possible_errors);
         }
         return Ok(());
     }
 
     pub fn finalize(self) -> Result<Audio, InvalidAudio> {
-        self.validate()?;
+        if let Result::Err(errors) = self.validate() {
+            return Err(errors[0].clone());
+        }
         return Ok(Audio {
             samples: self.samples,
             sampling_frequency: self.sampling_frequency,
@@ -83,6 +101,19 @@ impl Default for Audio {
     }
 }
 
+// Getters
+#[allow(dead_code)]
+impl Audio {
+    pub fn get_samples(self) -> Vec<f64> {
+        return self.samples;
+    }
+
+    pub fn get_sampling_frequency(&self) -> f64 {
+        return self.sampling_frequency;
+    }
+}
+
+// Operations
 #[allow(dead_code)]
 impl Audio {
     fn matching_sampling_frequency(&self, other: &Self) -> bool {
@@ -167,14 +198,6 @@ impl Audio {
         self.sample_left_pad(ammount);
     }
 
-    pub fn samples_to_milliseconds(sampling_frequency: f64, ammount: usize) -> f64 {
-        return (ammount as f64) * 1000_f64 / sampling_frequency;
-    }
-
-    pub fn milliseconds_to_samples(sampling_frequency: f64, time_interval: f64) -> usize {
-        return ((time_interval / 1000_f64) * sampling_frequency) as usize;
-    }
-
     pub fn sample_length(&self) -> usize {
         return self.samples.len();
     }
@@ -205,6 +228,39 @@ impl Audio {
     pub fn split_at_time_ms(self, time_ms: f64) -> (Self, Self) {
         let index = Self::milliseconds_to_samples(self.sampling_frequency, time_ms);
         return self.split_at_sample_index(index);
+    }
+}
+
+// Utils
+#[allow(dead_code)]
+impl Audio {
+    pub fn samples_to_milliseconds(sampling_frequency: f64, ammount: usize) -> f64 {
+        return (ammount as f64) * 1000_f64 / sampling_frequency;
+    }
+
+    pub fn milliseconds_to_samples(sampling_frequency: f64, time_interval: f64) -> usize {
+        return ((time_interval / 1000_f64) * sampling_frequency) as usize;
+    }
+
+    pub fn samples_as_vec_16(samples: Vec<f64>) -> Vec<i16> {
+        let new_vec: Vec<i16> = samples.into_iter().map(|sample| sample as i16).collect();
+        return new_vec;
+    }
+
+    pub fn write_wav(self) {
+        let vec = Audio::samples_as_vec_16(self.get_samples());
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 44100,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create("test.wav", spec).unwrap();
+
+        for sample in vec.into_iter() {
+            writer.write_sample(sample).unwrap();
+        }
+        writer.finalize().unwrap();
     }
 }
 

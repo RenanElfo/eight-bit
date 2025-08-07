@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+builder_derive_macro = { path = "./builder_derive_macro" }
+hound = "3.5.1"

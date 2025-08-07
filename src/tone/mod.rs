@@ -1,7 +1,20 @@
-pub mod note;
 pub mod standard_notes;
 
 pub use standard_notes::*;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum InvalidToneKind {
+    NanFrequency,
+    InfiniteFrequency,
+    NegativeFrequency,
+    OutOfBoundsNote,
+    NoEquivalentNote,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct InvalidTone {
+    kind: InvalidToneKind,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AvailableTones<const MAX_SIZE: usize> {
@@ -20,11 +33,13 @@ impl Default for Tone {
 }
 
 impl TryFrom<usize> for Tone {
-    type Error = &'static str;
+    type Error = InvalidTone;
 
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         if value >= NUMBER_OF_AVAILABLE_NOTES {
-            return Err("Passed usize value is larger than maximum allowed.");
+            return Err(InvalidTone {
+                kind: InvalidToneKind::OutOfBoundsNote,
+            });
         }
         return Ok(AvailableTones::Note(value));
     }
@@ -44,11 +59,23 @@ impl Into<f64> for Tone {
 }
 
 impl TryFrom<f64> for Tone {
-    type Error = &'static str;
+    type Error = InvalidTone;
 
     fn try_from(frequency: f64) -> Result<Self, Self::Error> {
         if frequency < 0_f64 {
-            return Err("Frequency value must be non-negative.");
+            return Err(InvalidTone {
+                kind: InvalidToneKind::NegativeFrequency,
+            });
+        }
+        if frequency.is_nan() {
+            return Err(InvalidTone {
+                kind: InvalidToneKind::NanFrequency,
+            });
+        }
+        if frequency.is_infinite() {
+            return Err(InvalidTone {
+                kind: InvalidToneKind::InfiniteFrequency,
+            });
         }
         return Ok(AvailableTones::Pitch(frequency));
     }
@@ -66,7 +93,7 @@ impl Tone {
         }
     }
 
-    pub fn as_note(self) -> Result<Self, &'static str> {
+    pub fn as_note(self) -> Result<Self, InvalidTone> {
         match self {
             AvailableTones::Pitch(frequency) => {
                 let possible_notes_indices = AVAILABLE_NOTES
@@ -80,10 +107,43 @@ impl Tone {
                     .nth(0);
                 match possible_notes_indices {
                     Some(index) => return AvailableTones::try_from(index),
-                    None => return Err("Hello World"),
+                    None => {
+                        return Err(InvalidTone {
+                            kind: InvalidToneKind::NoEquivalentNote,
+                        })
+                    }
                 }
             }
             AvailableTones::Note(_index) => Ok(self),
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl Tone {
+    pub fn get_minor_third(&self) -> Result<Self, InvalidTone> {
+        match self.clone() {
+            Self::Pitch(frequency) => {
+                let third = SEMI_TONE_FACTOR.powf(3.0) * frequency;
+                return Ok(Tone::Pitch(third));
+            }
+            Self::Note(note) => {
+                let third = note + 3;
+                return Ok(Tone::try_from(third)?);
+            }
+        }
+    }
+
+    pub fn get_major_third(&self) -> Result<Self, InvalidTone> {
+        match self.clone() {
+            Self::Pitch(frequency) => {
+                let third = SEMI_TONE_FACTOR.powf(4.0) * frequency;
+                return Ok(Tone::Pitch(third));
+            }
+            Self::Note(note) => {
+                let third = note + 4;
+                return Ok(Tone::try_from(third)?);
+            }
         }
     }
 }
