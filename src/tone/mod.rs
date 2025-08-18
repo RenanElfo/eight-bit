@@ -119,32 +119,75 @@ impl Tone {
     }
 }
 
-#[allow(dead_code)]
-impl Tone {
-    pub fn get_minor_third(&self) -> Result<Self, InvalidTone> {
-        match self.clone() {
-            Self::Pitch(frequency) => {
-                let third = SEMI_TONE_FACTOR.powf(3.0) * frequency;
-                return Ok(Tone::Pitch(third));
-            }
-            Self::Note(note) => {
-                let third = note + 3;
-                return Ok(Tone::try_from(third)?);
+macro_rules! relative_tone {
+    ($self: expr, $semi_notes: expr) => {
+        {
+            match $self.clone() {
+                Self::Pitch(frequency) => {
+                    let new_tone = SEMI_TONE_FACTOR.powf($semi_notes as f64) * frequency;
+                    return Ok(Tone::Pitch(new_tone));
+                }
+                Self::Note(note) => {
+                    let new_tone = note + $semi_notes as usize;
+                    return Ok(Tone::try_from(new_tone)?);
+                }
             }
         }
     }
+}
 
-    pub fn get_major_third(&self) -> Result<Self, InvalidTone> {
-        match self.clone() {
-            Self::Pitch(frequency) => {
-                let third = SEMI_TONE_FACTOR.powf(4.0) * frequency;
-                return Ok(Tone::Pitch(third));
-            }
-            Self::Note(note) => {
-                let third = note + 4;
-                return Ok(Tone::try_from(third)?);
-            }
-        }
+#[allow(dead_code)]
+impl Tone {
+    pub fn octavate(&self, octaves: i32) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 12 * octaves)
+    }
+
+    pub fn minor_second(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 1)
+    }
+
+    pub fn major_second(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 2)
+    }
+
+    pub fn minor_third(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 3)
+    }
+
+    pub fn major_third(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 4)
+    }
+
+    pub fn perfect_forth(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 5)
+    }
+
+    pub fn tritone(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 6)
+    }
+
+    pub fn perfect_fith(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 7)
+    }
+
+    pub fn minor_sixth(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 8)
+    }
+
+    pub fn major_sixth(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 9)
+    }
+
+    pub fn minor_seventh(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 10)
+    }
+
+    pub fn major_seventh(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 11)
+    }
+
+    pub fn octave(&self) -> Result<Self, InvalidTone> {
+        relative_tone!(self, 12)
     }
 }
 

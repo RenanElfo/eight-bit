@@ -3,7 +3,14 @@ use std::ops::Div;
 use std::ops::Sub;
 use std::result::Result;
 
+use builder_derive_macro::Setters;
+
 const DEFAULT_SAMPLING_FREQUENCY: f64 = 44100_f64;
+
+#[allow(dead_code)]
+pub trait ToAudio {
+    fn to_audio(&self) -> Result<Audio, InvalidAudio>;
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum InvalidAudioKind {
@@ -19,7 +26,7 @@ pub struct InvalidAudio {
     kind: InvalidAudioKind,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Setters)]
 pub struct AudioBuilder {
     samples: Vec<f64>,
     sampling_frequency: f64,
@@ -36,20 +43,8 @@ impl Default for AudioBuilder {
 
 #[allow(dead_code)]
 impl AudioBuilder {
-    pub fn new(values: Vec<f64>, sampling_frequency: f64) -> Self {
-        return AudioBuilder {
-            samples: values,
-            sampling_frequency,
-        };
-    }
-
     pub fn with_length(mut self, length: usize) -> Self {
         self.samples = vec![0.0; length];
-        return self;
-    }
-
-    pub fn with_sampling_frequency(mut self, sampling_frequency: f64) -> Self {
-        self.sampling_frequency = sampling_frequency;
         return self;
     }
 
@@ -238,6 +233,10 @@ impl Audio {
         return (ammount as f64) * 1000_f64 / sampling_frequency;
     }
 
+    pub fn samples_to_seconds(sampling_frequency: f64, ammount: usize) -> f64 {
+        return (ammount as f64) / sampling_frequency;
+    }
+
     pub fn milliseconds_to_samples(sampling_frequency: f64, time_interval: f64) -> usize {
         return ((time_interval / 1000_f64) * sampling_frequency) as usize;
     }
@@ -248,10 +247,11 @@ impl Audio {
     }
 
     pub fn write_wav(self) {
+        let sample_rate = self.sampling_frequency as u32;
         let vec = Audio::samples_as_vec_16(self.get_samples());
         let spec = hound::WavSpec {
             channels: 1,
-            sample_rate: 44100,
+            sample_rate,
             bits_per_sample: 16,
             sample_format: hound::SampleFormat::Int,
         };
