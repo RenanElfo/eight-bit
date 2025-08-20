@@ -265,10 +265,15 @@ impl Audio {
 }
 
 impl Sub for Audio {
-    type Output = Result<Self, InvalidAudio>;
+    type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
-        return self.merge(other);
+        match self.merge(other) {
+            Ok(merged_audio) => merged_audio,
+            Err(_merge_error) => {
+                todo!("Once implemented, we'll have automatic upsampling")
+            }
+        }
     }
 }
 

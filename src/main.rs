@@ -50,15 +50,12 @@ fn main() {
     let audio_3 = test_sine.to_audio().unwrap();
     let audio_4 = test_triangle.to_audio().unwrap();
     let audio_5 = test_sawtooth.to_audio().unwrap();
-    let audio = ((((((audio_1 / audio_2).unwrap() - audio_octavated).unwrap()
-        - audio_octavated_2)
-        .unwrap()
-        - audio_3)
-        .unwrap()
-        - audio_4)
-        .unwrap()
-        - audio_5)
-        .unwrap();
+    let audio = (audio_1 / audio_2).unwrap()
+        - audio_octavated
+        - audio_octavated_2
+        - audio_3
+        - audio_4
+        - audio_5;
 
     audio.write_wav();
 }
