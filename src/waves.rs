@@ -99,7 +99,7 @@ pub struct Pulse {
 }
 
 impl ToAudio for Pulse {
-    fn to_audio(&self) -> Result<Audio, InvalidAudio> {
+    fn to_audio(self) -> Result<Audio, InvalidAudio> {
         let frequency: f64 = self.tone.into();
         let period = 1.0 / frequency;
         let number_of_samples =
@@ -186,7 +186,7 @@ pub struct Sine {
 }
 
 impl ToAudio for Sine {
-    fn to_audio(&self) -> Result<Audio, InvalidAudio> {
+    fn to_audio(self) -> Result<Audio, InvalidAudio> {
         let frequency: f64 = self.tone.into();
         let number_of_samples =
             Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
@@ -268,7 +268,7 @@ pub struct Triangle {
 }
 
 impl ToAudio for Triangle {
-    fn to_audio(&self) -> Result<Audio, InvalidAudio> {
+    fn to_audio(self) -> Result<Audio, InvalidAudio> {
         let frequency: f64 = self.tone.into();
         let period: f64 = 1.0 / frequency;
         let number_of_samples =
@@ -357,7 +357,7 @@ pub struct Sawtooth {
 }
 
 impl ToAudio for Sawtooth {
-    fn to_audio(&self) -> Result<Audio, InvalidAudio> {
+    fn to_audio(self) -> Result<Audio, InvalidAudio> {
         let frequency: f64 = self.tone.into();
         let period: f64 = 1.0 / frequency;
         let number_of_samples =

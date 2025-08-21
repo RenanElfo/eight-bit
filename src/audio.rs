@@ -9,7 +9,7 @@ const DEFAULT_SAMPLING_FREQUENCY: f64 = 44100_f64;
 
 #[allow(dead_code)]
 pub trait ToAudio {
-    fn to_audio(&self) -> Result<Audio, InvalidAudio>;
+    fn to_audio(self) -> Result<Audio, InvalidAudio>;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -125,7 +125,10 @@ impl Audio {
         return Ok(AudioBuilder::new(new_values, self.sampling_frequency).finalize()?);
     }
 
-    pub fn merge_wave<T>(self, wave: T) -> Result<Self, InvalidAudio> where T: ToAudio {
+    pub fn merge_wave<T>(self, wave: T) -> Result<Self, InvalidAudio>
+    where
+        T: ToAudio,
+    {
         let other = wave.to_audio()?;
         return self.merge(other);
     }
@@ -266,6 +269,12 @@ impl Audio {
             writer.write_sample(sample).unwrap();
         }
         writer.finalize().unwrap();
+    }
+}
+
+impl ToAudio for Audio {
+    fn to_audio(self) -> Result<Audio, InvalidAudio> {
+        return Ok(self);
     }
 }
 
