@@ -6,6 +6,7 @@ use crate::get_struct_fields;
 
 type TokenStream2 = proc_macro2::TokenStream;
 
+#[allow(unused_variables)]
 pub fn create_finalize(input: TokenStream) -> TokenStream {
     let syntax_tree: syn::DeriveInput = syn::parse_macro_input!(input as syn::DeriveInput);
 

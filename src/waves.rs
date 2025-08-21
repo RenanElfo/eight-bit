@@ -19,11 +19,11 @@ pub struct InvalidWaveForm {
 
 #[derive(Clone, Debug, PartialEq, Setters, Finalize)]
 pub struct PulseBuilder {
-    #[bounds(1, 2, 3)]
+    // #[bounds(1, 2, 3)]
     tone: tone::Tone,
     amplitude: f64,
     duration_ms: f64,
-    #[bounds(1, ,)]
+    // #[bounds(1, ,)]
     rad_phase: f64,
     #[bounds(0.0, 1.0)]
     duty_cycle: f64,

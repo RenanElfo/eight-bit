@@ -125,6 +125,11 @@ impl Audio {
         return Ok(AudioBuilder::new(new_values, self.sampling_frequency).finalize()?);
     }
 
+    pub fn merge_wave<T>(self, wave: T) -> Result<Self, InvalidAudio> where T: ToAudio {
+        let other = wave.to_audio()?;
+        return self.merge(other);
+    }
+
     pub fn validate_overlap(&self, other: &Self) -> Result<(), Vec<InvalidAudio>> {
         let len_self = self.samples.len();
         let len_other = other.samples.len();
@@ -324,7 +329,7 @@ mod tests {
                 .finalize()
                 .unwrap()
         );
-        let w = (x - y).unwrap();
+        let w = x - y;
         assert_eq!(z, w);
     }
 
