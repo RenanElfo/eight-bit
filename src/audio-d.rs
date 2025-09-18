@@ -92,7 +92,7 @@ impl Default for Audio {
     fn default() -> Self {
         return AudioBuilder::default()
             .finalize()
-            .expect("Default Audio should be valid");
+            .expect("Default AudioBuilder should produce valid Audio");
     }
 }
 
@@ -250,7 +250,16 @@ impl Audio {
     }
 
     pub fn samples_as_vec_16(samples: Vec<f64>) -> Vec<i16> {
-        let new_vec: Vec<i16> = samples.into_iter().map(|sample| sample as i16).collect();
+        let max = samples
+            .clone()
+            .into_iter()
+            .map(|sample| sample.abs())
+            .reduce(f64::max)
+            .unwrap_or(0.0);
+        let new_vec: Vec<i16> = samples
+            .into_iter()
+            .map(|sample| (i16::MAX as f64 * sample / max) as i16)
+            .collect();
         return new_vec;
     }
 

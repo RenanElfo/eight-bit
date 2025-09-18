@@ -1,0 +1,97 @@
+use std::f64::consts::PI;
+
+use builder_derive_macro::{Finalize, Setters};
+
+use crate::audio::{Audio, AudioBuilder, InvalidAudio, ToAudio};
+use crate::tone;
+
+use super::{InvalidWaveForm, InvalidWaveFormKind};
+
+#[derive(Clone, Debug, PartialEq, Setters)]
+pub struct TriangleBuilder {
+    tone: tone::Tone,
+    amplitude: f64,
+    duration_ms: f64,
+    rad_phase: f64,
+    sampling_frequency: f64,
+}
+
+impl Default for TriangleBuilder {
+    fn default() -> Self {
+        return Self {
+            tone: tone::Tone::default(),
+            amplitude: 1.0,
+            duration_ms: 0.0,
+            rad_phase: 0.0,
+            sampling_frequency: 44100_f64,
+        };
+    }
+}
+
+#[allow(dead_code)]
+impl TriangleBuilder {
+    pub fn with_deg_phase(mut self, phase: f64) -> Self {
+        self.rad_phase = PI * phase / 180.0;
+        return self;
+    }
+
+    pub fn validate(&self) -> Result<(), Vec<InvalidWaveForm>> {
+        let mut possible_errors: Vec<InvalidWaveForm> = vec![];
+        if self.duration_ms < 0.0 {
+            possible_errors.push(InvalidWaveForm {
+                kind: InvalidWaveFormKind::NegativeDuration,
+            });
+        }
+        if !possible_errors.is_empty() {
+            return Err(possible_errors);
+        };
+        return Ok(());
+    }
+
+    pub fn finalize(self) -> Result<Triangle, InvalidWaveForm> {
+        if let Result::Err(error) = self.validate() {
+            return Err(error[0].clone());
+        }
+        return Ok(Triangle {
+            tone: self.tone,
+            amplitude: self.amplitude,
+            duration_ms: self.duration_ms,
+            rad_phase: self.rad_phase,
+            sampling_frequency: self.sampling_frequency,
+        });
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Triangle {
+    tone: tone::Tone,
+    amplitude: f64,
+    duration_ms: f64,
+    rad_phase: f64,
+    sampling_frequency: f64,
+}
+
+impl ToAudio for Triangle {
+    fn to_audio(self) -> Result<Audio, InvalidAudio> {
+        let frequency: f64 = self.tone.into();
+        let period: f64 = 1.0 / frequency;
+        let number_of_samples =
+            Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
+        let indices = 0..number_of_samples;
+        let samples: Vec<f64> = indices
+            .into_iter()
+            .map(|sample_index| {
+                let time = Audio::samples_to_seconds(self.sampling_frequency, sample_index);
+                let time_with_phase = time + self.rad_phase * period / (2.0 * PI);
+                let modulus = |x, m| ((x % m) + m) % m;
+                return 4.0
+                    * self.amplitude
+                    * frequency
+                    * f64::abs(modulus(time_with_phase - period / 4.0, period) - period / 2.0)
+                    - self.amplitude;
+            })
+            .collect();
+        let builder = AudioBuilder::new(samples, self.sampling_frequency);
+        return builder.finalize();
+    }
+}
