@@ -11,8 +11,8 @@ use super::{InvalidWaveForm, InvalidWaveFormKind};
 pub struct TriangleBuilder {
     tone: tone::Tone,
     amplitude: f64,
-    duration_ms: f64,
     rad_phase: f64,
+    duration_ms: f64,
     sampling_frequency: f64,
 }
 
@@ -21,8 +21,8 @@ impl Default for TriangleBuilder {
         return Self {
             tone: tone::Tone::default(),
             amplitude: 1.0,
-            duration_ms: 0.0,
             rad_phase: 0.0,
+            duration_ms: 0.0,
             sampling_frequency: 44100_f64,
         };
     }
@@ -55,9 +55,10 @@ impl TriangleBuilder {
         return Ok(Triangle {
             tone: self.tone,
             amplitude: self.amplitude,
-            duration_ms: self.duration_ms,
             rad_phase: self.rad_phase,
+            duration_ms: self.duration_ms,
             sampling_frequency: self.sampling_frequency,
+            sample_index: 0,
         });
     }
 }
@@ -66,32 +67,44 @@ impl TriangleBuilder {
 pub struct Triangle {
     tone: tone::Tone,
     amplitude: f64,
-    duration_ms: f64,
     rad_phase: f64,
+    duration_ms: f64,
     sampling_frequency: f64,
+    sample_index: usize,
+}
+
+impl Triangle {
+    fn number_of_samples(&self) -> usize {
+        return Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
+    }
+}
+
+impl Iterator for Triangle {
+    type Item = f64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.sample_index >= self.number_of_samples() {
+            return None;
+        }
+        let frequency: f64 = self.tone.into();
+        let period: f64 = 1.0 / frequency;
+        let time = Audio::samples_to_seconds(self.sampling_frequency, self.sample_index);
+        let time_with_phase = time + self.rad_phase * period / (2.0 * PI);
+        let modulus = |x, m| ((x % m) + m) % m;
+        self.sample_index = self.sample_index + 1;
+        return Some(
+            4.0 * self.amplitude
+                * frequency
+                * f64::abs(modulus(time_with_phase - period / 4.0, period) - period / 2.0)
+                - self.amplitude,
+        );
+    }
 }
 
 impl ToAudio for Triangle {
     fn to_audio(self) -> Result<Audio, InvalidAudio> {
-        let frequency: f64 = self.tone.into();
-        let period: f64 = 1.0 / frequency;
-        let number_of_samples =
-            Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
-        let indices = 0..number_of_samples;
-        let samples: Vec<f64> = indices
-            .into_iter()
-            .map(|sample_index| {
-                let time = Audio::samples_to_seconds(self.sampling_frequency, sample_index);
-                let time_with_phase = time + self.rad_phase * period / (2.0 * PI);
-                let modulus = |x, m| ((x % m) + m) % m;
-                return 4.0
-                    * self.amplitude
-                    * frequency
-                    * f64::abs(modulus(time_with_phase - period / 4.0, period) - period / 2.0)
-                    - self.amplitude;
-            })
-            .collect();
-        let builder = AudioBuilder::new(samples, self.sampling_frequency);
+        let sampling_frequency = self.sampling_frequency;
+        let builder = AudioBuilder::new(self.collect(), sampling_frequency);
         return builder.finalize();
     }
 }

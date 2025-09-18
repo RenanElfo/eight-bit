@@ -12,11 +12,11 @@ pub struct PulseBuilder {
     // #[bounds(1, 2, 3)]
     tone: tone::Tone,
     amplitude: f64,
-    duration_ms: f64,
     // #[bounds(1, ,)]
     rad_phase: f64,
     #[bounds(0.0, 1.0)]
     duty_cycle: f64,
+    duration_ms: f64,
     sampling_frequency: f64,
 }
 
@@ -25,9 +25,9 @@ impl Default for PulseBuilder {
         return Self {
             tone: tone::Tone::default(),
             amplitude: 1.0,
-            duration_ms: 0.0,
             rad_phase: 0.0,
             duty_cycle: 0.5,
+            duration_ms: 0.0,
             sampling_frequency: 44100_f64,
         };
     }
@@ -70,10 +70,11 @@ impl PulseBuilder {
         return Ok(Pulse {
             tone: self.tone,
             amplitude: self.amplitude,
-            duration_ms: self.duration_ms,
             rad_phase: self.rad_phase,
             duty_cycle: self.duty_cycle,
+            duration_ms: self.duration_ms,
             sampling_frequency: self.sampling_frequency,
+            sample_index: 0,
         });
     }
 }
@@ -82,31 +83,42 @@ impl PulseBuilder {
 pub struct Pulse {
     tone: tone::Tone,
     amplitude: f64,
-    duration_ms: f64,
     rad_phase: f64,
     duty_cycle: f64,
+    duration_ms: f64,
     sampling_frequency: f64,
+    sample_index: usize,
+}
+
+impl Pulse {
+    fn number_of_samples(&self) -> usize {
+        return Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
+    }
+}
+
+impl Iterator for Pulse {
+    type Item = f64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.sample_index >= self.number_of_samples() {
+            return None;
+        }
+        let frequency: f64 = self.tone.into();
+        let period = 1.0 / frequency;
+        let time = Audio::samples_to_seconds(self.sampling_frequency, self.sample_index);
+        let time_in_period = (time + self.rad_phase * period / (2.0 * PI)) % period;
+        self.sample_index = self.sample_index + 1;
+        if time_in_period <= self.duty_cycle * period {
+            return Some(self.amplitude);
+        }
+        return Some(-self.amplitude);
+    }
 }
 
 impl ToAudio for Pulse {
     fn to_audio(self) -> Result<Audio, InvalidAudio> {
-        let frequency: f64 = self.tone.into();
-        let period = 1.0 / frequency;
-        let number_of_samples =
-            Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
-        let indices = 0..number_of_samples;
-        let samples: Vec<f64> = indices
-            .into_iter()
-            .map(|sample_index| {
-                let time = Audio::samples_to_seconds(self.sampling_frequency, sample_index);
-                let time_in_period = (time + self.rad_phase * period / (2.0 * PI)) % period;
-                if time_in_period <= self.duty_cycle * period {
-                    return self.amplitude;
-                }
-                return -self.amplitude;
-            })
-            .collect();
-        let builder = AudioBuilder::new(samples, self.sampling_frequency);
+        let sampling_frequency = self.sampling_frequency;
+        let builder = AudioBuilder::new(self.collect(), sampling_frequency);
         return builder.finalize();
     }
 }

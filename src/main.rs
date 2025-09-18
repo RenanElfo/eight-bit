@@ -94,7 +94,8 @@ fn main() {
     //     - audio_6
     //     - audio_7
     //     - audio_8;
-    // let audio = audio_8 - audio_10 - audio_6 - audio_9 - audio_11;
+    let audio = audio_8 - audio_10 - audio_6 - audio_9 - audio_11;
+    audio.write_wav();
 
     let mut freq = 110.0;
     let mut tone = tone::Tone::Pitch(freq);
@@ -115,5 +116,15 @@ fn main() {
         audio = (audio / sine.clone().finalize().unwrap().to_audio().unwrap()).unwrap();
     }
 
-    (sine_audio - audio).write_wav();
+    let start_freq = 110.0;
+    let amplitude = 2.0_f64.powf(12.0);
+    let wave = waves::SawtoothBuilder::default()
+        .with_tone(tone::Tone::Pitch(start_freq))
+        .with_duration_ms(5000.0)
+        .with_amplitude(amplitude);
+        // .with_updater(Some(|sine: waves::Sine, sample: usize| -> waves::Sine {
+        //     return sine;
+        // }));
+    // wave.finalize().unwrap().to_audio().unwrap().write_wav();
+    // (sine_audio - audio).write_wav();
 }

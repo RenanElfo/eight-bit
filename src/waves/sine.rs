@@ -7,13 +7,16 @@ use crate::tone;
 
 use super::{InvalidWaveForm, InvalidWaveFormKind};
 
+// type UpdaterFunction = Option<impl Fn(&Sine, usize) -> Sine>;
+
 #[derive(Clone, Debug, PartialEq, Setters)]
 pub struct SineBuilder {
     tone: tone::Tone,
     amplitude: f64,
-    duration_ms: f64,
     rad_phase: f64,
+    duration_ms: f64,
     sampling_frequency: f64,
+    // updater: Option<impl Fn(&Sine, usize) -> Sine>,
 }
 
 impl Default for SineBuilder {
@@ -21,9 +24,10 @@ impl Default for SineBuilder {
         return Self {
             tone: tone::Tone::default(),
             amplitude: 1.0,
-            duration_ms: 0.0,
             rad_phase: 0.0,
+            duration_ms: 0.0,
             sampling_frequency: 44100_f64,
+            // updater: None,
         };
     }
 }
@@ -55,9 +59,11 @@ impl SineBuilder {
         return Ok(Sine {
             tone: self.tone,
             amplitude: self.amplitude,
-            duration_ms: self.duration_ms,
             rad_phase: self.rad_phase,
+            duration_ms: self.duration_ms,
             sampling_frequency: self.sampling_frequency,
+            sample_index: 0,
+            // updater: self.updater,
         });
     }
 }
@@ -66,25 +72,38 @@ impl SineBuilder {
 pub struct Sine {
     tone: tone::Tone,
     amplitude: f64,
-    duration_ms: f64,
     rad_phase: f64,
+    duration_ms: f64,
     sampling_frequency: f64,
+    sample_index: usize,
+    // updater: UpdaterFunction,
+}
+
+impl Sine {
+    fn number_of_samples(&self) -> usize {
+        return Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
+    }
+}
+
+impl Iterator for Sine {
+    type Item = f64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.sample_index >= self.number_of_samples() {
+            return None;
+        }
+        let frequency: f64 = self.tone.into();
+        let time = Audio::samples_to_seconds(self.sampling_frequency, self.sample_index);
+        let sample = self.amplitude * (2.0 * PI * frequency * time + self.rad_phase).sin();
+        self.sample_index = self.sample_index + 1;
+        return Some(sample);
+    }
 }
 
 impl ToAudio for Sine {
     fn to_audio(self) -> Result<Audio, InvalidAudio> {
-        let frequency: f64 = self.tone.into();
-        let number_of_samples =
-            Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
-        let indices = 0..number_of_samples;
-        let samples: Vec<f64> = indices
-            .into_iter()
-            .map(|sample_index| {
-                let time = Audio::samples_to_seconds(self.sampling_frequency, sample_index);
-                return self.amplitude * (2.0 * PI * frequency * time + self.rad_phase).sin();
-            })
-            .collect();
-        let builder = AudioBuilder::new(samples, self.sampling_frequency);
+        let sampling_frequency = self.sampling_frequency;
+        let builder = AudioBuilder::new(self.collect(), sampling_frequency);
         return builder.finalize();
     }
 }

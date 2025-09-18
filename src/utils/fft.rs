@@ -41,3 +41,34 @@ pub fn irfft(signal_rfft: Vec<Complex<f64>>, length: usize) -> Vec<f64> {
         .collect()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fft() {
+        let epsilon = 0.0001;
+        let samples: Vec<f64> = vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5];
+        let length = samples.len();
+        let samples_rfft = rfft(&samples);
+        let samples_irfft = irfft(samples_rfft.clone(), length);
+        assert_eq!(length, samples_irfft.len());
+        assert!(samples_rfft.clone().first().unwrap().im.abs() < epsilon);
+        assert!(samples_rfft.clone().last().unwrap().im.abs() < epsilon);
+        let mut sub: Vec<f64> = vec![0.0; length];
+        for i in 0..length {
+            sub[i] = (samples[i] - samples_irfft[i]).abs();
+        }
+        assert!(sub.into_iter().all(|diff| diff < epsilon));
+        let samples: Vec<f64> = vec![0.0, 0.1, 0.2, 0.3, 0.4];
+        let length = samples.len();
+        let samples_rfft = rfft(&samples);
+        let samples_irfft = irfft(samples_rfft.clone(), length);
+        assert_eq!(length, samples_irfft.len());
+        let mut sub: Vec<f64> = vec![0.0; length];
+        for i in 0..length {
+            sub[i] = (samples[i] - samples_irfft[i]).abs();
+        }
+        assert!(sub.into_iter().all(|diff| diff < epsilon));
+    }
+}

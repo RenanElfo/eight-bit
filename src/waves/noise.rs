@@ -70,6 +70,8 @@ impl NoiseBuilder {
             seed: self.seed,
             variant: self.variant,
             sampling_frequency: self.sampling_frequency,
+            rng: SmallRng::seed_from_u64(self.seed),
+            sample_index: 0,
         });
     }
 }
@@ -81,13 +83,40 @@ pub struct Noise {
     seed: u64,
     variant: NoiseVariant,
     sampling_frequency: f64,
+    rng: SmallRng,
+    sample_index: usize,
+}
+
+impl Noise {
+    fn number_of_samples(&self) -> usize {
+        return Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
+    }
+}
+
+impl Iterator for Noise {
+    type Item = f64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.sample_index >= self.number_of_samples() {
+            return None;
+        }
+        self.sample_index = self.sample_index + 1;
+        let uniform_sample_1 = self.rng.next_u32() as f64 / u32::MAX as f64;
+        // println!("{}", uniform_sample_1);
+        let uniform_sample_2 = self.rng.next_u32() as f64 / u32::MAX as f64;
+        // println!("{}", uniform_sample_2);
+        let normal_sample = self.amplitude
+            * f64::sqrt(-2.0 * f64::ln(uniform_sample_1))
+            * f64::cos(2.0 * PI * uniform_sample_2);
+        return Some(normal_sample);
+    }
 }
 
 fn get_noise(
     sampling_frequency: f64,
     number_of_samples: usize,
     normal_samples: Vec<f64>,
-    noise_closure: fn(f64) -> f64,
+    noise_closure: impl Fn(f64) -> f64,
 ) -> Result<Audio, InvalidAudio> {
     let normal_samples_rfft = rfft(&normal_samples);
     let spectral_density =
@@ -105,26 +134,15 @@ fn get_noise(
 
 impl ToAudio for Noise {
     fn to_audio(self) -> Result<Audio, InvalidAudio> {
-        let mut random_number_generator = SmallRng::seed_from_u64(self.seed);
-        let number_of_samples =
-            Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
-        let indices = 0..number_of_samples;
-        let normal_samples: Vec<f64> = indices
-            .into_iter()
-            .map(|_sample_index| {
-                let uniform_sample_1 = random_number_generator.next_u32() as f64 / u32::MAX as f64;
-                let uniform_sample_2 = random_number_generator.next_u32() as f64 / u32::MAX as f64;
-                let normal_sample = self.amplitude
-                    * f64::sqrt(-2.0 * f64::ln(uniform_sample_1))
-                    * f64::cos(2.0 * PI * uniform_sample_2);
-                return normal_sample;
-            })
-            .collect();
-        return match self.variant {
+        let number_of_samples = self.number_of_samples();
+        let sampling_frequency = self.sampling_frequency;
+        let variant = self.variant.clone();
+        let normal_samples: Vec<f64> = self.collect();
+        return match variant {
             NoiseVariant::Violet => {
                 let blue_noise_function = |freq: f64| freq;
                 get_noise(
-                    self.sampling_frequency,
+                    sampling_frequency,
                     number_of_samples,
                     normal_samples,
                     blue_noise_function,
@@ -133,14 +151,14 @@ impl ToAudio for Noise {
             NoiseVariant::Blue => {
                 let blue_noise_function = |freq: f64| f64::sqrt(freq);
                 get_noise(
-                    self.sampling_frequency,
+                    sampling_frequency,
                     number_of_samples,
                     normal_samples,
                     blue_noise_function,
                 )
             }
             NoiseVariant::White => {
-                let builder = AudioBuilder::new(normal_samples, self.sampling_frequency);
+                let builder = AudioBuilder::new(normal_samples, sampling_frequency);
                 builder.finalize()
             }
             NoiseVariant::Pink => {
@@ -152,7 +170,7 @@ impl ToAudio for Noise {
                     }
                 };
                 get_noise(
-                    self.sampling_frequency,
+                    sampling_frequency,
                     number_of_samples,
                     normal_samples,
                     pink_noise_function,
@@ -161,7 +179,7 @@ impl ToAudio for Noise {
             NoiseVariant::Brown => {
                 let brown_noise_function = |freq: f64| if freq != 0.0 { 1.0 / freq } else { 0.0 };
                 get_noise(
-                    self.sampling_frequency,
+                    sampling_frequency,
                     number_of_samples,
                     normal_samples,
                     brown_noise_function,
@@ -192,36 +210,4 @@ fn generate_power_spectral_density<F: Fn(f64) -> f64>(
         .map(|density| density / power)
         .collect();
     return normalized_spectrum_density;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_fft() {
-        let epsilon = 0.0001;
-        let samples: Vec<f64> = vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5];
-        let length = samples.len();
-        let samples_rfft = rfft(&samples);
-        let samples_irfft = irfft(samples_rfft.clone(), length);
-        assert_eq!(length, samples_irfft.len());
-        assert!(samples_rfft.clone().first().unwrap().im.abs() < epsilon);
-        assert!(samples_rfft.clone().last().unwrap().im.abs() < epsilon);
-        let mut sub: Vec<f64> = vec![0.0; length];
-        for i in 0..length {
-            sub[i] = (samples[i] - samples_irfft[i]).abs();
-        }
-        assert!(sub.into_iter().all(|diff| diff < epsilon));
-        let samples: Vec<f64> = vec![0.0, 0.1, 0.2, 0.3, 0.4];
-        let length = samples.len();
-        let samples_rfft = rfft(&samples);
-        let samples_irfft = irfft(samples_rfft.clone(), length);
-        assert_eq!(length, samples_irfft.len());
-        let mut sub: Vec<f64> = vec![0.0; length];
-        for i in 0..length {
-            sub[i] = (samples[i] - samples_irfft[i]).abs();
-        }
-        assert!(sub.into_iter().all(|diff| diff < epsilon));
-    }
 }
