@@ -3,6 +3,7 @@ use quote::{format_ident, quote};
 
 use crate::get_struct_fields::get_struct_fields;
 
+// TODO: change Setters proc macro such that it works with generics
 pub fn create_getters_and_setters(input: TokenStream) -> TokenStream {
     let syntax_tree: syn::DeriveInput = syn::parse_macro_input!(input as syn::DeriveInput);
 
