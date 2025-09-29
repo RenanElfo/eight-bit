@@ -95,7 +95,7 @@ fn main() {
     //     - audio_7
     //     - audio_8;
     let audio = audio_8 - audio_10 - audio_6 - audio_9 - audio_11;
-    audio.write_wav();
+    // audio.write_wav();
 
     let mut freq = 110.0;
     let mut tone = tone::Tone::Pitch(freq);
@@ -115,16 +115,40 @@ fn main() {
         sine = sine.with_tone(tone).with_amplitude(amplitude);
         audio = (audio / sine.clone().finalize().unwrap().to_audio().unwrap()).unwrap();
     }
+    audio.write_wav();
 
     let start_freq = 110.0;
-    let amplitude = 2.0_f64.powf(12.0);
-    let wave = waves::SawtoothBuilder::default()
+    // let amplitude = 2.0_f64.powf(12.0);
+    let amplitude = 1.0;
+    let wave = waves::SineBuilder::default()
         .with_tone(tone::Tone::Pitch(start_freq))
         .with_duration_ms(5000.0)
-        .with_amplitude(amplitude);
+        .with_amplitude(amplitude)
+        .with_updater(Some(|sine: waves::SineBuilder, _index: usize| {
+            let tone = sine.get_tone();
+            let frequency: f64 = Into::<f64>::into(*tone);
+            // println!("{}", frequency);
+            let new_sine = sine.with_tone(tone::Tone::Pitch(frequency + 0.01));
+            return new_sine.finalize().unwrap();
+        }));
         // .with_updater(Some(|sine: waves::Sine, sample: usize| -> waves::Sine {
         //     return sine;
         // }));
+    let wave_2 = wave.clone().with_rad_phase(-std::f64::consts::PI);
+    // let wave_2 = wave.clone().with_amplitude(-amplitude);
+    let audio_wave = wave.finalize().unwrap().to_audio().unwrap();
+    let audio_wave_2 = wave_2.finalize().unwrap().to_audio().unwrap();
+    let mut diff: Vec<f64> = vec![];
+    let samples = audio_wave.clone().get_samples();
+    let samples_2 = audio_wave_2.clone().get_samples();
+    for i in 0..samples.len() {
+        diff.push(samples[i] + samples_2[i]);
+    }
+    println!("{:?}", diff);
+    // println!("{:?}", audio_wave.clone().get_samples());
+    // println!("{:?}", audio_wave_2.clone().get_samples());
     // wave.finalize().unwrap().to_audio().unwrap().write_wav();
+    // audio_wave.write_wav();
+    // (audio_wave / audio_wave_2).unwrap().write_wav();
     // (sine_audio - audio).write_wav();
 }
