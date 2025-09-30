@@ -1,14 +1,45 @@
 // use builder_derive_macro::{Finalize, Setters};
 
-use crate::audio::ToAudio;
+use crate::audio::{Audio, ToAudio};
 use crate::utils::build::Build;
 
-// TODO: change Setters proc macro such that it works with generics
+mod hit;
+use hit::{Hit, Rest, RythmElement};
+mod tests;
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum Beat {
+    WholeNote,
+    HalfNote,
+    #[default]
+    QuarterNote,
+    QuarterNoteTriplet,
+    EigthNote,
+    SixteenthNote,
+    ThirtySecondNote,
+}
+
+impl Beat {
+    fn duration_factor(&self) -> f64 {
+        match self {
+            Self::WholeNote => 1.0,
+            Self::HalfNote => 0.5,
+            Self::QuarterNote => 0.25,
+            Self::QuarterNoteTriplet => 1.0 / 12.0,
+            Self::EigthNote => 1.0 / 8.0,
+            Self::SixteenthNote => 1.0 / 16.0,
+            Self::ThirtySecondNote => 1.0 / 32.0,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct RythmBuilder<T: ToAudio + Clone> {
     tempo_bpm: f64,
+    beat_type: Beat,
     // #[skip_setter]
-    rythm: Vec<T>,
+    rythm: Vec<RythmElement<T>>,
 }
 
 #[allow(dead_code)]
@@ -21,12 +52,22 @@ impl<T: ToAudio + Clone> RythmBuilder<T> {
         self.tempo_bpm = tempo_bpm;
         return self;
     }
+
+    pub fn get_beat_type(&self) -> &Beat {
+        return &self.beat_type;
+    }
+
+    pub fn with_beat_type(mut self, beat_type: Beat) -> Self {
+        self.beat_type = beat_type;
+        return self;
+    }
 }
 
 impl<T: ToAudio + Clone> Default for RythmBuilder<T> {
     fn default() -> Self {
         return Self {
             tempo_bpm: 60.0,
+            beat_type: Beat::default(),
             rythm: vec![],
         };
     }
@@ -51,47 +92,56 @@ impl<T: ToAudio + Clone> Build<Rythm<T>, ()> for RythmBuilder<T> {
         }
         return Ok(Rythm {
             tempo_bpm: self.tempo_bpm,
+            beat_type: self.beat_type,
             rythm: vec![],
         });
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Rythm<T: ToAudio + Clone> {
+pub struct Rythm<T: ToAudio> {
     tempo_bpm: f64,
-    rythm: Vec<T>,
+    beat_type: Beat,
+    rythm: Vec<RythmElement<T>>,
 }
 
 #[allow(dead_code)]
-impl<T: ToAudio + Clone> Rythm<T> {
-    pub fn hit(mut self, _duration: f64, sound: T) {
-        // let audio = sound.to_audio();
-        self.rythm.push(sound);
+impl<T: ToAudio> Rythm<T> {
+    pub fn hit(mut self, duration: f64, _sound: T) {
+        self.rythm.push(RythmElement::Rest(Rest {
+            relative_duration: duration,
+        }));
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::waves;
-
-    #[test]
-    fn common_use() {
-        let x = RythmBuilder::default()
-            .with_tempo_bpm(90.0)
-            .finalize()
-            .unwrap();
-        x.hit(0.25, waves::SineBuilder::default().finalize().unwrap());
+#[allow(dead_code)]
+impl<T: ToAudio> Rythm<T> {
+    fn hit_duration(&self, hit: RythmElement<T>) -> f64 {
+        let ms_per_min = 60.0 * 1000.0;
+        let whole_notes_per_minute = self.tempo_bpm * self.beat_type.duration_factor();
+        let whole_note_duration_milliseconds = ms_per_min * (1.0 / whole_notes_per_minute);
+        whole_note_duration_milliseconds * hit.relative_duration()
     }
 
-    #[test]
-    fn test_macro_attr() {
-        let x: RythmBuilder<waves::Sine> = RythmBuilder {
-            tempo_bpm: 60.0,
-            rythm: vec![],
-        }
-        .with_tempo_bpm(45.0);
-        assert_eq!(x.get_tempo_bpm(), &45.0);
-        // .with_rythm(vec![1.0]);
+    fn bla(mut self, duration: f64, _sound: T) {
+        self.rythm.push(RythmElement::Rest(Rest {
+            relative_duration: duration,
+        }));
     }
 }
+
+impl<T: ToAudio> Iterator for Rythm<T> {
+    type Item = Audio;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
+}
+
+// impl<A: ToAudio> Extend<RythmElement<A>> for Rythm<A> {
+//     fn extend<T: IntoIterator<Item = RythmElement<A>>>(&mut self, iter: T) {
+//         for elem in iter {
+//             self.hit(RythmElement::Rest(Rest { relative_duration: 0.0 }));
+//         }
+//     }
+// }
