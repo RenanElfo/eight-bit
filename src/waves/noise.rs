@@ -2,11 +2,12 @@ use std::f64::consts::PI;
 
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::num_complex::Complex;
 
 use builder_derive_macro::{Finalize, Setters};
 
-use crate::audio::{Audio, AudioBuilder, InvalidAudio, ToAudio};
+use crate::utils::build::Build;
+use crate::audio::{Audio, AudioBuilder, InvalidAudio, traits::ToAudio};
 use crate::utils::fft::{rfft, irfft, rfft_freq_bins};
 
 use super::{InvalidWaveForm, InvalidWaveFormKind};
@@ -23,10 +24,8 @@ pub enum NoiseVariant {
 
 #[derive(Clone, Debug, PartialEq, Setters, Finalize)]
 pub struct NoiseBuilder {
-    // #[bounds(1, 2, 3)]
     amplitude: f64,
     duration_ms: f64,
-    // #[bounds(1, ,)]
     seed: u64,
     variant: NoiseVariant,
     #[bounds(0.0, 1.0)]
@@ -102,9 +101,7 @@ impl Iterator for Noise {
         }
         self.sample_index = self.sample_index + 1;
         let uniform_sample_1 = self.rng.next_u32() as f64 / u32::MAX as f64;
-        // println!("{}", uniform_sample_1);
         let uniform_sample_2 = self.rng.next_u32() as f64 / u32::MAX as f64;
-        // println!("{}", uniform_sample_2);
         let normal_sample = self.amplitude
             * f64::sqrt(-2.0 * f64::ln(uniform_sample_1))
             * f64::cos(2.0 * PI * uniform_sample_2);

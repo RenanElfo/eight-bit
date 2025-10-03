@@ -1,9 +1,15 @@
 use std::f64::consts::PI;
 
-use builder_derive_macro::{Finalize, Setters};
+use builder_derive_macro::Setters;
 
-use crate::audio::{Audio, AudioBuilder, InvalidAudio, ToAudio};
+use crate::utils::build::Build;
+use crate::audio::{Audio, AudioBuilder, InvalidAudio, traits::ToAudio};
 use crate::tone;
+use crate::waves::traits::has_tone::HasTone;
+use crate::waves::traits::has_amplitude::HasAmplitude;
+use crate::waves::traits::has_phase::HasPhase;
+use crate::audio::traits::HasSamplingFrequency;
+use crate::{impl_has_tone, impl_has_amplitude, impl_has_phase, impl_has_sampling_frequency};
 
 use super::{InvalidWaveForm, InvalidWaveFormKind};
 
@@ -13,11 +19,10 @@ type UpdaterFunction = Option<fn(SineBuilder, usize) -> Sine>;
 pub struct SineBuilder {
     tone: tone::Tone,
     amplitude: f64,
-    rad_phase: f64,
+    phase_rad: f64,
     duration_ms: f64,
     sampling_frequency: f64,
     updater: UpdaterFunction,
-    // updater: Option<impl Fn(&Sine, usize) -> Sine>,
 }
 
 impl Default for SineBuilder {
@@ -25,7 +30,7 @@ impl Default for SineBuilder {
         return Self {
             tone: tone::Tone::default(),
             amplitude: 1.0,
-            rad_phase: 0.0,
+            phase_rad: 0.0,
             duration_ms: 0.0,
             sampling_frequency: 44100_f64,
             updater: None,
@@ -34,13 +39,11 @@ impl Default for SineBuilder {
 }
 
 #[allow(dead_code)]
-impl SineBuilder {
-    pub fn with_deg_phase(mut self, phase: f64) -> Self {
-        self.rad_phase = PI * phase / 180.0;
-        return self;
-    }
-
-    pub fn validate(&self) -> Result<(), Vec<InvalidWaveForm>> {
+impl Build for SineBuilder {
+    type Output = Sine;
+    type Error = InvalidWaveForm;
+    
+    fn validate(&self) -> Result<(), Vec<Self::Error>> {
         let mut possible_errors: Vec<InvalidWaveForm> = vec![];
         if self.duration_ms < 0.0 {
             possible_errors.push(InvalidWaveForm {
@@ -53,14 +56,14 @@ impl SineBuilder {
         return Ok(());
     }
 
-    pub fn finalize(self) -> Result<Sine, InvalidWaveForm> {
+    fn finalize(self) -> Result<Self::Output, Self::Error> {
         if let Result::Err(error) = self.validate() {
             return Err(error[0].clone());
         }
         return Ok(Sine {
             tone: self.tone,
             amplitude: self.amplitude,
-            rad_phase: self.rad_phase,
+            phase_rad: self.phase_rad,
             duration_ms: self.duration_ms,
             sampling_frequency: self.sampling_frequency,
             sample_index: 0,
@@ -73,12 +76,17 @@ impl SineBuilder {
 pub struct Sine {
     tone: tone::Tone,
     amplitude: f64,
-    rad_phase: f64,
+    phase_rad: f64,
     duration_ms: f64,
     sampling_frequency: f64,
     sample_index: usize,
     updater: UpdaterFunction,
 }
+
+impl_has_tone!(Sine);
+impl_has_amplitude!(Sine);
+impl_has_phase!(Sine);
+impl_has_sampling_frequency!(Sine);
 
 impl Sine {
     fn number_of_samples(&self) -> usize {
@@ -91,11 +99,11 @@ impl Into<SineBuilder> for &mut Sine {
         return SineBuilder {
             tone: self.tone,
             amplitude: self.amplitude,
-            rad_phase: self.rad_phase,
+            phase_rad: self.phase_rad,
             duration_ms: self.duration_ms,
             sampling_frequency: self.sampling_frequency,
             updater: self.updater,
-        }
+        };
     }
 }
 
@@ -109,7 +117,7 @@ impl Iterator for Sine {
         }
         let frequency: f64 = self.tone.into();
         let time = Audio::samples_to_seconds(self.sampling_frequency, sample_index);
-        let sample = self.amplitude * (2.0 * PI * frequency * time + self.rad_phase).sin();
+        let sample = self.amplitude * (2.0 * PI * frequency * time + self.phase_rad).sin();
         if let Option::Some(updater_function) = self.updater {
             let builder = Into::<SineBuilder>::into(&mut *self);
             *self = updater_function(builder, self.sample_index);

@@ -1,6 +1,8 @@
 use std::ops::Div;
 use std::ops::Sub;
 
+use crate::utils::build::Build;
+
 use super::{AudioBuilder, Audio, ToAudio, InvalidAudio, InvalidAudioKind};
 
 impl Sub for Audio {

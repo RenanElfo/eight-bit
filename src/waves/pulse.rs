@@ -2,7 +2,8 @@ use std::f64::consts::PI;
 
 use builder_derive_macro::{Finalize, Setters};
 
-use crate::audio::{Audio, AudioBuilder, InvalidAudio, ToAudio};
+use crate::utils::build::Build;
+use crate::audio::{Audio, AudioBuilder, InvalidAudio, traits::ToAudio};
 use crate::tone;
 
 use super::{InvalidWaveForm, InvalidWaveFormKind};

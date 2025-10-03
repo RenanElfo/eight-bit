@@ -5,7 +5,7 @@ mod tests {
 
     #[test]
     fn common_use() {
-        let x = RythmBuilder::default()
+        let mut x = RythmBuilder::default()
             .with_tempo_bpm(90.0)
             .finalize()
             .unwrap();
@@ -16,7 +16,8 @@ mod tests {
     fn test_macro_attr() {
         let x: RythmBuilder<waves::Sine> = RythmBuilder {
             tempo_bpm: 60.0,
-            rythm: vec![],
+            beat_type: Beat::QuarterNote,
+            rythm: vec![].into(),
         }
         .with_tempo_bpm(45.0);
         // .with_rythm(vec![1.0]);

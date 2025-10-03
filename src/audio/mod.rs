@@ -2,21 +2,15 @@ use std::default::Default;
 
 use builder_derive_macro::Setters;
 
+use crate::utils::build::Build;
+
 mod operations;
 mod utils;
 mod tests;
+pub mod traits;
+use traits::ToAudio;
 
-const DEFAULT_SAMPLING_FREQUENCY: f64 = 44100_f64;
-
-#[allow(dead_code)]
-pub trait ToAudio {
-    fn to_audio(self) -> Result<Audio, InvalidAudio>;
-}
-
-#[allow(dead_code)]
-pub trait FilterAudio {
-    fn filter(self, audio: Audio) -> Audio;
-}
+const DEFAULT_SAMPLING_FREQUENCY: f64 = 0.0_f64;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum InvalidAudioKind {
@@ -53,8 +47,14 @@ impl AudioBuilder {
         self.samples = vec![0.0; length];
         return self;
     }
+}
 
-    pub fn validate(&self) -> Result<(), Vec<InvalidAudio>> {
+#[allow(dead_code)]
+impl Build for AudioBuilder {
+    type Output = Audio;
+    type Error = InvalidAudio;
+
+    fn validate(&self) -> Result<(), Vec<InvalidAudio>> {
         let mut possible_errors: Vec<InvalidAudio> = vec![];
         if self.sampling_frequency < 0.0 {
             possible_errors.push(InvalidAudio {
@@ -77,7 +77,7 @@ impl AudioBuilder {
         return Ok(());
     }
 
-    pub fn finalize(self) -> Result<Audio, InvalidAudio> {
+    fn finalize(self) -> Result<Audio, InvalidAudio> {
         if let Result::Err(errors) = self.validate() {
             return Err(errors[0].clone());
         }

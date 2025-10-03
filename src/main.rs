@@ -1,8 +1,9 @@
 mod audio;
-use audio::ToAudio;
+use audio::traits::ToAudio;
 mod rythm;
 mod tone;
 mod utils;
+use utils::build::Build;
 mod waves;
 
 #[allow(unused_variables)]
@@ -134,7 +135,7 @@ fn main() {
         // .with_updater(Some(|sine: waves::Sine, sample: usize| -> waves::Sine {
         //     return sine;
         // }));
-    let wave_2 = wave.clone().with_rad_phase(-std::f64::consts::PI);
+    let wave_2 = wave.clone().with_phase_rad(-std::f64::consts::PI);
     // let wave_2 = wave.clone().with_amplitude(-amplitude);
     let audio_wave = wave.finalize().unwrap().to_audio().unwrap();
     let audio_wave_2 = wave_2.finalize().unwrap().to_audio().unwrap();

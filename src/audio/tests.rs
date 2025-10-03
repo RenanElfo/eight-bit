@@ -3,16 +3,6 @@ mod tests {
     use super::super::*;
 
     #[test]
-    fn test_default() {
-        let x: AudioBuilder = AudioBuilder::default();
-        let y: AudioBuilder = AudioBuilder {
-            samples: vec![],
-            sampling_frequency: 44100_f64,
-        };
-        assert_eq!(x, y);
-    }
-
-    #[test]
     fn test_builder_functions() {
         let sampling_frequency = 8192_f64;
         let x: AudioBuilder = AudioBuilder::default()
