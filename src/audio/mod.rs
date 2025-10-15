@@ -2,13 +2,17 @@ use std::default::Default;
 
 use builder_derive_macro::Setters;
 
+use crate::time::has_duration::HasDuration;
+use crate::time::has_sampling_frequency::HasSamplingFrequency;
+use crate::time::{milliseconds_to_samples, samples_to_milliseconds};
 use crate::utils::build::Build;
 
+pub mod basic_filters;
 mod operations;
-mod utils;
 mod tests;
 pub mod traits;
-use traits::ToAudio;
+mod utils;
+// use traits::ToAudio;
 
 const DEFAULT_SAMPLING_FREQUENCY: f64 = 0.0_f64;
 
@@ -83,7 +87,7 @@ impl Build for AudioBuilder {
         }
         return Ok(Audio {
             samples: self.samples,
-            sampling_frequency: self.sampling_frequency,
+            sampling_frequency: Some(self.sampling_frequency),
         });
     }
 }
@@ -91,31 +95,63 @@ impl Build for AudioBuilder {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Audio {
     samples: Vec<f64>,
-    sampling_frequency: f64,
+    sampling_frequency: Option<f64>,
+}
+
+impl Audio {
+    pub fn filter_audio<T>(self, filter: T) -> Audio where T: traits::FilterAudio {
+        filter.filter(self)
+    }
+}
+
+impl HasSamplingFrequency for Audio {
+    fn get_sampling_frequency(&self) -> f64 {
+        let sampling_frequency = self.sampling_frequency.unwrap_or(0.0);
+        match sampling_frequency {
+            0.0.. => sampling_frequency,
+            _ => 0.0,
+        }
+    }
+
+    fn set_sampling_frequency(&mut self, sampling_frequency: f64) {
+        if self.sampling_frequency.is_none() {
+            self.sampling_frequency = match sampling_frequency {
+                0.0.. => Some(sampling_frequency),
+                _ => None,
+            }
+        } else {
+            if self.get_sampling_frequency() == sampling_frequency {
+                return ();
+            }
+            println!("{:?}", sampling_frequency);
+            todo!("TODO: do upsampling/downsampling");
+        }
+    }
+}
+
+impl HasDuration for Audio {
+    fn get_duration_ms(&self) -> f64 {
+        samples_to_milliseconds(self.get_sampling_frequency(), self.sample_length())
+    }
+
+    fn set_duration_ms(&mut self, duration_ms: f64) {
+        let sampling_frequency = self.get_sampling_frequency();
+        let new_length = milliseconds_to_samples(sampling_frequency, duration_ms);
+        self.samples.resize(new_length, 0.0);
+    }
 }
 
 impl Default for Audio {
     fn default() -> Self {
-        return AudioBuilder::default()
-            .finalize()
-            .expect("Default AudioBuilder should produce valid Audio");
+        return Audio {
+            samples: vec![],
+            sampling_frequency: None,
+        };
     }
 }
 
-// Getters
-#[allow(dead_code)]
-impl Audio {
-    pub fn get_samples(self) -> Vec<f64> {
-        return self.samples;
-    }
-
-    pub fn get_sampling_frequency(&self) -> f64 {
-        return self.sampling_frequency;
-    }
-}
-
-impl ToAudio for Audio {
-    fn to_audio(self) -> Result<Audio, InvalidAudio> {
-        return Ok(self);
-    }
-}
+// impl Into<Audio> for Audio {
+//     fn into(self) -> Audio {
+//         return self;
+//     }
+// }

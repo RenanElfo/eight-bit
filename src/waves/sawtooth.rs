@@ -2,15 +2,24 @@ use std::f64::consts::PI;
 
 use builder_derive_macro::Setters;
 
+use crate::audio::{Audio, AudioBuilder, InvalidAudio};
+use crate::time::has_duration::HasDuration;
+use crate::time::has_sampling_frequency::HasSamplingFrequency;
+use crate::time::{milliseconds_to_samples, samples_to_seconds};
 use crate::utils::build::Build;
-use crate::audio::{Audio, AudioBuilder, InvalidAudio, traits::ToAudio};
-use crate::tone;
+use crate::waves::traits::has_amplitude::HasAmplitude;
+use crate::waves::traits::has_phase::HasPhase;
+use crate::waves::traits::has_tone::HasTone;
+use crate::{
+    impl_has_amplitude, impl_has_duration, impl_has_phase, impl_has_sampling_frequency,
+    impl_has_tone,
+};
 
 use super::{InvalidWaveForm, InvalidWaveFormKind};
 
 #[derive(Clone, Debug, PartialEq, Setters)]
 pub struct SawtoothBuilder {
-    tone: tone::Tone,
+    tone: f64,
     amplitude: f64,
     duration_ms: f64,
     rad_phase: f64,
@@ -20,7 +29,7 @@ pub struct SawtoothBuilder {
 impl Default for SawtoothBuilder {
     fn default() -> Self {
         return Self {
-            tone: tone::Tone::default(),
+            tone: 0.0,
             amplitude: 1.0,
             duration_ms: 0.0,
             rad_phase: 0.0,
@@ -57,7 +66,7 @@ impl SawtoothBuilder {
             tone: self.tone,
             amplitude: self.amplitude,
             duration_ms: self.duration_ms,
-            rad_phase: self.rad_phase,
+            phase_rad: self.rad_phase,
             sampling_frequency: self.sampling_frequency,
             sample_index: 0,
         });
@@ -66,17 +75,23 @@ impl SawtoothBuilder {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Sawtooth {
-    tone: tone::Tone,
+    tone: f64,
     amplitude: f64,
     duration_ms: f64,
-    rad_phase: f64,
+    phase_rad: f64,
     sampling_frequency: f64,
     sample_index: usize,
 }
 
+impl_has_tone!(Sawtooth);
+impl_has_amplitude!(Sawtooth);
+impl_has_phase!(Sawtooth);
+impl_has_duration!(Sawtooth);
+impl_has_sampling_frequency!(Sawtooth);
+
 impl Sawtooth {
     fn number_of_samples(&self) -> usize {
-        return Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
+        return milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
     }
 }
 
@@ -89,22 +104,21 @@ impl Iterator for Sawtooth {
         }
         let frequency: f64 = self.tone.into();
         let period: f64 = 1.0 / frequency;
-        let time = Audio::samples_to_seconds(self.sampling_frequency, self.sample_index);
-        let time_with_phase = time + self.rad_phase * period / (2.0 * PI);
+        let time = samples_to_seconds(self.sampling_frequency, self.sample_index);
+        let time_with_phase = time + self.phase_rad * period / (2.0 * PI);
         let modulus = |x, m| ((x % m) + m) % m;
         self.sample_index = self.sample_index + 1;
-        return Some(2.0
-            * self.amplitude
-            * frequency
-            * modulus(time_with_phase + period / 2.0, period)
-            - self.amplitude);
+        return Some(
+            2.0 * self.amplitude * frequency * modulus(time_with_phase + period / 2.0, period)
+                - self.amplitude,
+        );
     }
 }
 
-impl ToAudio for Sawtooth {
-    fn to_audio(self) -> Result<Audio, InvalidAudio> {
+impl Into<Audio> for Sawtooth {
+    fn into(self) -> Audio {
         let sampling_frequency = self.sampling_frequency;
         let builder = AudioBuilder::new(self.collect(), sampling_frequency);
-        return builder.finalize();
+        return builder.finalize().expect("TODO");
     }
 }

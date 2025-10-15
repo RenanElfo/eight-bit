@@ -16,45 +16,26 @@ pub struct InvalidTone {
     kind: InvalidToneKind,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum AvailableTones<const MAX_SIZE: usize> {
-    Pitch(f64),
-    Note(usize),
+#[derive(Clone, Debug, PartialEq)]
+pub struct Tone {
+    pitch: f64,
 }
 
-pub type Tone = AvailableTones<NUMBER_OF_AVAILABLE_NOTES>;
-
-impl Default for Tone {
-    fn default() -> Self {
-        return AvailableTones::Pitch(A_FREQUENCY)
-            .as_note()
-            .expect("A_FREQUENCY should have been a valid frequency");
+impl Tone {
+    pub fn get_pitch(&self) -> f64 {
+        self.pitch
     }
 }
 
-impl TryFrom<usize> for Tone {
-    type Error = InvalidTone;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        if value >= NUMBER_OF_AVAILABLE_NOTES {
-            return Err(InvalidTone {
-                kind: InvalidToneKind::OutOfBoundsNote,
-            });
-        }
-        return Ok(AvailableTones::Note(value));
+impl Default for Tone {
+    fn default() -> Self {
+        return Tone { pitch: A_FREQUENCY };
     }
 }
 
 impl Into<f64> for Tone {
     fn into(self) -> f64 {
-        match self {
-            Self::Pitch(frequency) => {
-                return frequency;
-            }
-            Self::Note(index) => {
-                return AVAILABLE_NOTES[index];
-            }
-        }
+        return self.pitch;
     }
 }
 
@@ -77,63 +58,69 @@ impl TryFrom<f64> for Tone {
                 kind: InvalidToneKind::InfiniteFrequency,
             });
         }
-        return Ok(AvailableTones::Pitch(frequency));
+        return Ok(Tone { pitch: frequency });
     }
 }
+//
+// impl From<f64> for Tone {
+//     fn from(frequency: f64) -> Self {
+//         return
+//     }
+// }
 
-#[allow(dead_code)]
-impl Tone {
-    pub fn as_pitch(self) -> Self {
-        match self {
-            AvailableTones::Pitch(_frequency) => self,
-            AvailableTones::Note(_index) => {
-                let frequency: f64 = self.into();
-                return AvailableTones::Pitch(frequency);
-            }
-        }
-    }
-
-    pub fn as_note(self) -> Result<Self, InvalidTone> {
-        match self {
-            AvailableTones::Pitch(frequency) => {
-                let possible_notes_indices = AVAILABLE_NOTES
-                    .into_iter()
-                    .enumerate()
-                    .filter(|(_index, note)| {
-                        let distance = (note - frequency).abs();
-                        return distance < LOWEST_NOTE;
-                    })
-                    .map(|(index, _note)| index)
-                    .nth(0);
-                match possible_notes_indices {
-                    Some(index) => return AvailableTones::try_from(index),
-                    None => {
-                        return Err(InvalidTone {
-                            kind: InvalidToneKind::NoEquivalentNote,
-                        })
-                    }
-                }
-            }
-            AvailableTones::Note(_index) => Ok(self),
-        }
-    }
-}
+// #[allow(dead_code)]
+// impl Tone {
+//     pub fn as_pitch(self) -> Self {
+//         match self {
+//             AvailableTones::Pitch(_frequency) => self,
+//             AvailableTones::Note(_index) => {
+//                 let frequency: f64 = self.into();
+//                 return AvailableTones::Pitch(frequency);
+//             }
+//         }
+//     }
+//
+//     pub fn as_note(self) -> Result<Self, InvalidTone> {
+//         match self {
+//             AvailableTones::Pitch(frequency) => {
+//                 let possible_notes_indices = AVAILABLE_NOTES
+//                     .into_iter()
+//                     .enumerate()
+//                     .filter(|(_index, note)| {
+//                         let distance = (note - frequency).abs();
+//                         return distance < LOWEST_NOTE;
+//                     })
+//                     .map(|(index, _note)| index)
+//                     .nth(0);
+//                 match possible_notes_indices {
+//                     Some(index) => return AvailableTones::try_from(index),
+//                     None => {
+//                         return Err(InvalidTone {
+//                             kind: InvalidToneKind::NoEquivalentNote,
+//                         })
+//                     }
+//                 }
+//             }
+//             AvailableTones::Note(_index) => Ok(self),
+//         }
+//     }
+// }
 
 macro_rules! relative_tone {
-    ($self: expr, $semi_notes: expr) => {
-        {
-            match $self.clone() {
-                Self::Pitch(frequency) => {
-                    let new_tone = SEMI_TONE_FACTOR.powf($semi_notes as f64) * frequency;
-                    return Ok(Tone::Pitch(new_tone));
-                }
-                Self::Note(note) => {
-                    let new_tone = note + $semi_notes as usize;
-                    return Ok(Tone::try_from(new_tone)?);
-                }
-            }
-        }
-    }
+    ($self: expr, $semi_notes: expr) => {{
+        let new_tone = SEMI_TONE_FACTOR.powf($semi_notes as f64) * $self.pitch;
+        return Ok(Tone { pitch: new_tone });
+        // match $self.clone() {
+        //     Self::Pitch(frequency) => {
+        //         let new_tone = SEMI_TONE_FACTOR.powf($semi_notes as f64) * frequency;
+        //         return Ok(Tone::Pitch(new_tone));
+        //     }
+        //     Self::Note(note) => {
+        //         let new_tone = note + $semi_notes as usize;
+        //         return Ok(Tone::try_from(new_tone)?);
+        //     }
+        // }
+    }};
 }
 
 #[allow(dead_code)]

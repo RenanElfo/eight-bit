@@ -1,31 +1,27 @@
 use super::Audio;
 
+use crate::time::has_sampling_frequency::HasSamplingFrequency;
+use crate::time::samples_to_milliseconds;
+
 #[allow(dead_code)]
 impl Audio {
+    pub fn get_samples(self) -> Vec<f64> {
+        return self.samples;
+    }
+
     pub fn sample_length(&self) -> usize {
         return self.samples.len();
     }
 
     pub fn milliseconds_length(&self) -> f64 {
-        return Audio::samples_to_milliseconds(self.sampling_frequency, self.sample_length());
+        let sampling_frequency = self.get_sampling_frequency();
+        return samples_to_milliseconds(sampling_frequency, self.sample_length());
     }
 
-    pub fn samples_to_milliseconds(sampling_frequency: f64, ammount: usize) -> f64 {
-        return (ammount as f64) * 1000_f64 / sampling_frequency;
-    }
-
-    pub fn samples_to_seconds(sampling_frequency: f64, ammount: usize) -> f64 {
-        return (ammount as f64) / sampling_frequency;
-    }
-
-    pub fn milliseconds_to_samples(sampling_frequency: f64, time_interval: f64) -> usize {
-        return ((time_interval / 1000_f64) * sampling_frequency) as usize;
-    }
-
-    pub fn samples_as_vec_16(samples: Vec<f64>) -> Vec<i16> {
+    pub fn samples_as_vec_16(self) -> Vec<i16> {
+        let samples = self.get_samples();
         let max = samples
-            .clone()
-            .into_iter()
+            .iter()
             .map(|sample| sample.abs())
             .reduce(f64::max)
             .unwrap_or(0.0);
@@ -37,8 +33,9 @@ impl Audio {
     }
 
     pub fn write_wav(self) {
-        let sample_rate = self.sampling_frequency as u32;
-        let vec = Audio::samples_as_vec_16(self.get_samples());
+        let sample_rate = self.get_sampling_frequency() as u32;
+        println!("{:?}", sample_rate);
+        let vec = self.samples_as_vec_16();
         let spec = hound::WavSpec {
             channels: 1,
             sample_rate,
@@ -53,4 +50,3 @@ impl Audio {
         writer.finalize().unwrap();
     }
 }
-

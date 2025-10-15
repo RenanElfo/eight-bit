@@ -20,7 +20,7 @@ mod tests {
         let y: Audio = AudioBuilder::new(vec![4.0, 5.0, 6.0], 44100_f64)
             .finalize()
             .unwrap();
-        let z = x.clone().merge(y.clone()).unwrap();
+        let z = x.clone().merge_audio(y.clone()).unwrap();
         assert_eq!(
             z,
             AudioBuilder::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 44100_f64)

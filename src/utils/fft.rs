@@ -1,4 +1,4 @@
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex};
 
 pub fn rfft_freq_bins(length: usize, sampling_frequency: f64) -> Vec<f64> {
     (0..=length / 2)

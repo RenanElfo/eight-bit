@@ -3,10 +3,13 @@ pub use pulse::*;
 mod sine;
 pub use sine::*;
 mod triangle;
+#[allow(unused_imports)]
 pub use triangle::*;
 mod sawtooth;
+#[allow(unused_imports)]
 pub use sawtooth::*;
 mod noise;
+#[allow(unused_imports)]
 pub use noise::*;
 pub mod traits;
 
@@ -21,4 +24,3 @@ pub enum InvalidWaveFormKind {
 pub struct InvalidWaveForm {
     kind: InvalidWaveFormKind,
 }
-

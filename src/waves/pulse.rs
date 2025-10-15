@@ -1,21 +1,28 @@
 use std::f64::consts::PI;
 
-use builder_derive_macro::{Finalize, Setters};
+use builder_derive_macro::Setters;
 
+// use crate::audio::traits::ToAudio;
+use crate::audio::{Audio, AudioBuilder};
+use crate::time::has_duration::HasDuration;
+use crate::time::has_sampling_frequency::HasSamplingFrequency;
+use crate::time::{infer_number_of_samples, samples_to_seconds};
 use crate::utils::build::Build;
-use crate::audio::{Audio, AudioBuilder, InvalidAudio, traits::ToAudio};
-use crate::tone;
+use crate::waves::traits::has_amplitude::HasAmplitude;
+use crate::waves::traits::has_phase::HasPhase;
+use crate::waves::traits::has_tone::HasTone;
+use crate::{
+    impl_has_amplitude, impl_has_duration, impl_has_phase, impl_has_sampling_frequency,
+    impl_has_tone,
+};
 
 use super::{InvalidWaveForm, InvalidWaveFormKind};
 
-#[derive(Clone, Debug, PartialEq, Setters, Finalize)]
+#[derive(Clone, Debug, PartialEq, Setters)]
 pub struct PulseBuilder {
-    // #[bounds(1, 2, 3)]
-    tone: tone::Tone,
+    tone: f64,
     amplitude: f64,
-    // #[bounds(1, ,)]
     rad_phase: f64,
-    #[bounds(0.0, 1.0)]
     duty_cycle: f64,
     duration_ms: f64,
     sampling_frequency: f64,
@@ -24,7 +31,7 @@ pub struct PulseBuilder {
 impl Default for PulseBuilder {
     fn default() -> Self {
         return Self {
-            tone: tone::Tone::default(),
+            tone: 0.0,
             amplitude: 1.0,
             rad_phase: 0.0,
             duty_cycle: 0.5,
@@ -71,7 +78,7 @@ impl PulseBuilder {
         return Ok(Pulse {
             tone: self.tone,
             amplitude: self.amplitude,
-            rad_phase: self.rad_phase,
+            phase_rad: self.rad_phase,
             duty_cycle: self.duty_cycle,
             duration_ms: self.duration_ms,
             sampling_frequency: self.sampling_frequency,
@@ -82,32 +89,32 @@ impl PulseBuilder {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pulse {
-    tone: tone::Tone,
+    tone: f64,
     amplitude: f64,
-    rad_phase: f64,
+    phase_rad: f64,
     duty_cycle: f64,
     duration_ms: f64,
     sampling_frequency: f64,
     sample_index: usize,
 }
 
-impl Pulse {
-    fn number_of_samples(&self) -> usize {
-        return Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
-    }
-}
+impl_has_tone!(Pulse);
+impl_has_amplitude!(Pulse);
+impl_has_phase!(Pulse);
+impl_has_duration!(Pulse);
+impl_has_sampling_frequency!(Pulse);
 
 impl Iterator for Pulse {
     type Item = f64;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.sample_index >= self.number_of_samples() {
+        if self.sample_index >= infer_number_of_samples(self) {
             return None;
         }
         let frequency: f64 = self.tone.into();
         let period = 1.0 / frequency;
-        let time = Audio::samples_to_seconds(self.sampling_frequency, self.sample_index);
-        let time_in_period = (time + self.rad_phase * period / (2.0 * PI)) % period;
+        let time = samples_to_seconds(self.sampling_frequency, self.sample_index);
+        let time_in_period = (time + self.phase_rad * period / (2.0 * PI)) % period;
         self.sample_index = self.sample_index + 1;
         if time_in_period <= self.duty_cycle * period {
             return Some(self.amplitude);
@@ -116,10 +123,10 @@ impl Iterator for Pulse {
     }
 }
 
-impl ToAudio for Pulse {
-    fn to_audio(self) -> Result<Audio, InvalidAudio> {
+impl Into<Audio> for Pulse {
+    fn into(self) -> Audio {
         let sampling_frequency = self.sampling_frequency;
         let builder = AudioBuilder::new(self.collect(), sampling_frequency);
-        return builder.finalize();
+        return builder.finalize().expect("TODO");
     }
 }

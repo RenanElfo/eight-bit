@@ -6,12 +6,18 @@ use rustfft::num_complex::Complex;
 
 use builder_derive_macro::{Finalize, Setters};
 
+use crate::audio::{Audio, AudioBuilder};
+use crate::time::has_duration::HasDuration;
+use crate::time::has_sampling_frequency::HasSamplingFrequency;
+use crate::time::milliseconds_to_samples;
 use crate::utils::build::Build;
-use crate::audio::{Audio, AudioBuilder, InvalidAudio, traits::ToAudio};
-use crate::utils::fft::{rfft, irfft, rfft_freq_bins};
+use crate::utils::fft::{irfft, rfft, rfft_freq_bins};
+use crate::waves::traits::has_amplitude::HasAmplitude;
+use crate::{impl_has_amplitude, impl_has_duration, impl_has_sampling_frequency};
 
 use super::{InvalidWaveForm, InvalidWaveFormKind};
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum NoiseVariant {
     Violet,
@@ -88,9 +94,13 @@ pub struct Noise {
 
 impl Noise {
     fn number_of_samples(&self) -> usize {
-        return Audio::milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
+        return milliseconds_to_samples(self.sampling_frequency, self.duration_ms);
     }
 }
+
+impl_has_amplitude!(Noise);
+impl_has_duration!(Noise);
+impl_has_sampling_frequency!(Noise);
 
 impl Iterator for Noise {
     type Item = f64;
@@ -114,7 +124,7 @@ fn get_noise(
     number_of_samples: usize,
     normal_samples: Vec<f64>,
     noise_closure: impl Fn(f64) -> f64,
-) -> Result<Audio, InvalidAudio> {
+) -> Audio {
     let normal_samples_rfft = rfft(&normal_samples);
     let spectral_density =
         generate_power_spectral_density(number_of_samples, sampling_frequency, noise_closure);
@@ -126,11 +136,11 @@ fn get_noise(
     }
     let noise_samples = irfft(noise_samples_rfft, number_of_samples);
     let builder = AudioBuilder::new(noise_samples, sampling_frequency);
-    builder.finalize()
+    builder.finalize().expect("TODO")
 }
 
-impl ToAudio for Noise {
-    fn to_audio(self) -> Result<Audio, InvalidAudio> {
+impl Into<Audio> for Noise {
+    fn into(self) -> Audio {
         let number_of_samples = self.number_of_samples();
         let sampling_frequency = self.sampling_frequency;
         let variant = self.variant.clone();
@@ -156,7 +166,7 @@ impl ToAudio for Noise {
             }
             NoiseVariant::White => {
                 let builder = AudioBuilder::new(normal_samples, sampling_frequency);
-                builder.finalize()
+                builder.finalize().expect("TODO")
             }
             NoiseVariant::Pink => {
                 let pink_noise_function = |freq: f64| {

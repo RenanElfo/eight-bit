@@ -1,12 +1,12 @@
 use std::collections::VecDeque;
 
-// use builder_derive_macro::{Finalize, Setters};
-
-use crate::audio::{Audio, InvalidAudio, traits::ToAudio};
+use crate::audio::{basic_filters::Decay, Audio};
+use crate::time::has_duration::HasDuration;
 use crate::utils::build::Build;
+use crate::waves::traits::has_tone::HasTone;
 
 mod hit;
-use hit::{Rest, RythmElement};
+use hit::{Hit, Rest, RythmElement};
 mod tests;
 
 #[allow(dead_code)]
@@ -16,7 +16,7 @@ pub enum Beat {
     HalfNote,
     #[default]
     QuarterNote,
-    QuarterNoteTriplet,
+    EightNoteTriplet,
     EigthNote,
     SixteenthNote,
     ThirtySecondNote,
@@ -29,7 +29,7 @@ impl Beat {
             Self::WholeNote => 1.0,
             Self::HalfNote => 0.5,
             Self::QuarterNote => 0.25,
-            Self::QuarterNoteTriplet => 1.0 / 12.0,
+            Self::EightNoteTriplet => 1.0 / 12.0,
             Self::EigthNote => 1.0 / 8.0,
             Self::SixteenthNote => 1.0 / 16.0,
             Self::ThirtySecondNote => 1.0 / 32.0,
@@ -39,17 +39,18 @@ impl Beat {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct RythmBuilder<T: ToAudio + Clone> {
+pub struct RythmBuilder<T: Into<Audio> + Clone> {
     tempo_bpm: f64,
     beat_type: Beat,
-    // #[skip_setter]
     rythm: VecDeque<RythmElement<T>>,
+    clamp: bool,
+    decay: Option<Decay>,
 }
 
 #[allow(dead_code)]
-impl<T: ToAudio + Clone> RythmBuilder<T> {
-    pub fn get_tempo_bpm(&self) -> &f64 {
-        return &self.tempo_bpm;
+impl<T: Into<Audio> + Clone> RythmBuilder<T> {
+    pub fn get_tempo_bpm(&self) -> f64 {
+        return self.tempo_bpm;
     }
 
     pub fn with_tempo_bpm(mut self, tempo_bpm: f64) -> Self {
@@ -65,19 +66,35 @@ impl<T: ToAudio + Clone> RythmBuilder<T> {
         self.beat_type = beat_type;
         return self;
     }
+
+    pub fn get_clamp(&self) -> bool {
+        return self.clamp;
+    }
+
+    pub fn with_clamp(mut self, clamp: bool) -> Self {
+        self.clamp = clamp;
+        return self;
+    }
+
+    pub fn with_decay(mut self, decay: Decay) -> Self {
+        self.decay = Some(decay);
+        return self;
+    }
 }
 
-impl<T: ToAudio + Clone> Default for RythmBuilder<T> {
+impl<T: Into<Audio> + Clone> Default for RythmBuilder<T> {
     fn default() -> Self {
         return Self {
             tempo_bpm: 60.0,
             beat_type: Beat::default(),
             rythm: VecDeque::new(),
+            clamp: false,
+            decay: None,
         };
     }
 }
 
-impl<T: ToAudio + Clone> Build for RythmBuilder<T> {
+impl<T: Into<Audio> + Clone> Build for RythmBuilder<T> {
     type Output = Rythm<T>;
     type Error = ();
 
@@ -102,39 +119,89 @@ impl<T: ToAudio + Clone> Build for RythmBuilder<T> {
             beat_type: self.beat_type,
             hit_start_time_ms: 0.0,
             rythm: VecDeque::new(),
-            largest_sampling_frequency: 0.0,
+            clamp: false,
+            decay: self.decay,
         });
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Rythm<T: ToAudio> {
+pub struct Rythm<T: Into<Audio>> {
     tempo_bpm: f64,
     beat_type: Beat,
     hit_start_time_ms: f64,
     rythm: VecDeque<RythmElement<T>>,
-    largest_sampling_frequency: f64,
+    clamp: bool,
+    decay: Option<Decay>,
 }
 
 #[allow(dead_code)]
-impl<T: ToAudio> Rythm<T> {
-    pub fn hit(&mut self, duration: f64, _sound: T) {
-        self.rythm.push_back(RythmElement::Rest(Rest {
-            relative_duration: duration,
-        }));
+impl<T: Into<Audio>> Rythm<T> {
+    pub fn hit(&mut self, duration: f64, sound: T) {
+        if duration < 0.0 {
+            self.rythm.push_back(RythmElement::Rest(Rest {
+                relative_duration: -duration,
+            }));
+        } else if duration > 0.0 {
+            self.rythm.push_back(RythmElement::Hit(Hit {
+                relative_duration: duration,
+                wave: sound,
+            }));
+        }
+    }
+
+    pub fn hits_with_frequency(&mut self, root_sound: T, notes: &[(f64, &str)])
+    where
+        T: HasTone + Clone,
+    {
+        for (duration, note) in notes {
+            let mut cloned_sound = root_sound.clone();
+            let parse_result = cloned_sound.parse_and_set_tone(note);
+            match parse_result {
+                Ok(()) => self.hit(*duration, cloned_sound),
+                Err(()) => self.hit(-(*duration).abs(), cloned_sound),
+            }
+        }
+    }
+
+    pub fn hits_with_duration(&mut self, root_sound: T, durations: &[(f64, f64)])
+    where
+        T: HasDuration + Clone,
+    {
+        for (hit_duration, sound_duration) in durations {
+            let mut cloned_sound = root_sound.clone();
+            cloned_sound.set_duration_ms(*sound_duration);
+            self.hit(*hit_duration, cloned_sound);
+        }
+    }
+
+    pub fn hits_with_matching_duration(&mut self, root_sound: T, durations: &[f64])
+    where
+        T: HasDuration + Clone,
+    {
+        let durations: Vec<_> = durations
+            .iter()
+            .map(|duration| (*duration, *duration))
+            .collect();
+        self.hits_with_duration(root_sound, &durations);
+    }
+}
+
+impl<T: Into<Audio>> Rythm<T> {}
+
+#[allow(dead_code)]
+impl<T: Into<Audio> + Clone> Rythm<T> {
+    pub fn bis(&mut self, repetitions: usize) {
+        let original: Vec<_> = self.rythm.iter().cloned().collect();
+        self.rythm.reserve(self.rythm.len() * repetitions);
+        for _ in 0..repetitions {
+            self.rythm.extend(original.iter().cloned());
+        }
     }
 }
 
 #[allow(dead_code)]
-impl<T: ToAudio + Clone> Rythm<T> {
-    pub fn bis(&mut self) {
-        let mut repeated = self.rythm.clone();
-        self.rythm.append(&mut repeated);
-    }
-}
-
-#[allow(dead_code)]
-impl<T: ToAudio> Rythm<T> {
+impl<T: Into<Audio>> Rythm<T> {
     fn hit_duration_ms(&self, hit: &RythmElement<T>) -> f64 {
         let ms_per_min = 60.0 * 1000.0;
         let whole_notes_per_minute = self.tempo_bpm * self.beat_type.duration_factor();
@@ -143,7 +210,7 @@ impl<T: ToAudio> Rythm<T> {
     }
 }
 
-impl<T: ToAudio> Iterator for Rythm<T> {
+impl<T: Into<Audio>> Iterator for Rythm<T> {
     type Item = Audio;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -154,7 +221,11 @@ impl<T: ToAudio> Iterator for Rythm<T> {
         let wave = hit.wave();
         match wave {
             Some(wave) => {
-                let mut audio = wave.to_audio().unwrap();
+                let mut audio = wave.into();
+                if let Some(decay) = &self.decay {
+                    audio = audio.filter_audio(decay.clone());
+                }
+                audio.set_duration_ms(duration);
                 audio.milliseconds_left_pad(hit_start_time_ms);
                 Some(audio)
             }
@@ -163,16 +234,9 @@ impl<T: ToAudio> Iterator for Rythm<T> {
     }
 }
 
-impl<T: ToAudio> ToAudio for Rythm<T> {
-    fn to_audio(self) -> Result<Audio, InvalidAudio> {
-        let audio_results = self.map(|hit| hit.to_audio());
-        let mut audios: Vec<Audio> = vec![];
-        for result in audio_results {
-            audios.push(result?);
-        }
-        Ok(audios
-            .into_iter()
-            .reduce(|acc, audio| acc - audio)
-            .unwrap_or(Audio::default()))
+impl<T: Into<Audio>> Into<Audio> for Rythm<T> {
+    fn into(self) -> Audio {
+        self.reduce(|acc, audio| acc / audio)
+            .unwrap_or(Audio::default())
     }
 }

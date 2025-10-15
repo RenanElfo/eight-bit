@@ -1,25 +1,21 @@
 use std::ops::Div;
 use std::ops::Sub;
 
-use crate::utils::build::Build;
+use crate::time::has_sampling_frequency::HasSamplingFrequency;
+use crate::time::milliseconds_to_samples;
 
-use super::{AudioBuilder, Audio, ToAudio, InvalidAudio, InvalidAudioKind};
+use super::Audio;
 
 impl Sub for Audio {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
-        match self.merge(other) {
-            Ok(merged_audio) => merged_audio,
-            Err(_merge_error) => {
-                todo!("Once implemented, we'll have automatic upsampling")
-            }
-        }
+        self.merge_audio(other)
     }
 }
 
 impl Div for Audio {
-    type Output = Result<Self, InvalidAudio>;
+    type Output = Self;
 
     fn div(self, other: Self) -> Self::Output {
         return self.overlap(other);
@@ -28,71 +24,53 @@ impl Div for Audio {
 
 #[allow(dead_code)]
 impl Audio {
-    fn matching_sampling_frequency(&self, other: &Self) -> bool {
-        return self.sampling_frequency == other.sampling_frequency;
+    fn match_length(&mut self, other: &mut Self) {
+        self.match_sampling_frequencies(other);
+        let len_self = self.samples.len();
+        let len_other = other.samples.len();
+        let length = len_self.max(len_other);
+        self.samples.resize(length, 0.0);
+        other.samples.resize(length, 0.0);
     }
 
-    pub fn merge(self, other: Self) -> Result<Self, InvalidAudio> {
-        if !self.matching_sampling_frequency(&other) {
-            return Err(InvalidAudio {
-                kind: InvalidAudioKind::MismatchedSamplingFrequency,
-            });
-        }
+    fn match_sampling_frequencies(&mut self, other: &mut Self) {
+        let sampling_frequency = f64::max(
+            self.get_sampling_frequency(),
+            other.get_sampling_frequency(),
+        );
+        self.set_sampling_frequency(sampling_frequency);
+        other.set_sampling_frequency(sampling_frequency);
+    }
+
+    pub fn merge_audio(mut self, mut other: Self) -> Self {
+        self.match_sampling_frequencies(&mut other);
         let new_values = [&self.samples[..], &other.samples[..]].concat();
-        return Ok(AudioBuilder::new(new_values, self.sampling_frequency).finalize()?);
-    }
-
-    pub fn merge_wave<T>(self, wave: T) -> Result<Self, InvalidAudio>
-    where
-        T: ToAudio,
-    {
-        let other = wave.to_audio()?;
-        return self.merge(other);
-    }
-
-    pub fn validate_overlap(&self, other: &Self) -> Result<(), Vec<InvalidAudio>> {
-        let len_self = self.samples.len();
-        let len_other = other.samples.len();
-        let mut possible_errors: Vec<InvalidAudio> = vec![];
-        if !&self.matching_sampling_frequency(&other) {
-            possible_errors.push(InvalidAudio {
-                kind: InvalidAudioKind::MismatchedSamplingFrequency,
-            });
-        }
-        if len_self != len_other {
-            possible_errors.push(InvalidAudio {
-                kind: InvalidAudioKind::MismatchedLength,
-            });
-        }
-        if !possible_errors.is_empty() {
-            return Err(possible_errors);
+        return Audio {
+            samples: new_values,
+            sampling_frequency: Some(self.get_sampling_frequency()),
         };
-        return Ok(());
     }
 
-    pub fn overlap(self, other: Self) -> Result<Self, InvalidAudio> {
-        let len_self = self.samples.len();
-        let len_other = other.samples.len();
-        if !&self.matching_sampling_frequency(&other) {
-            return Err(InvalidAudio {
-                kind: InvalidAudioKind::MismatchedSamplingFrequency,
-            });
-        }
-        if len_self != len_other {
-            return Err(InvalidAudio {
-                kind: InvalidAudioKind::MismatchedLength,
-            });
-        }
+    pub fn merge<T>(self, wave: T) -> Self
+    where
+        T: Into<Audio>,
+    {
+        let other = wave.into();
+        return self.merge_audio(other);
+    }
+
+    pub fn overlap(mut self, mut other: Self) -> Self {
+        self.match_length(&mut other);
         let overlapped_samples = self
             .samples
             .into_iter()
             .zip(other.samples.into_iter())
             .map(|(sample_self, sample_other)| sample_self + sample_other)
             .collect();
-        return Ok(Audio {
+        return Audio {
             samples: overlapped_samples,
             sampling_frequency: self.sampling_frequency,
-        });
+        };
     }
 
     pub fn reverse(mut self) {
@@ -104,7 +82,8 @@ impl Audio {
     }
 
     pub fn milliseconds_right_pad(&mut self, time_interval: f64) {
-        let ammount = Audio::milliseconds_to_samples(self.sampling_frequency, time_interval);
+        let sampling_frequency = self.sampling_frequency.unwrap_or(0.0);
+        let ammount = milliseconds_to_samples(sampling_frequency, time_interval);
         self.sample_right_pad(ammount);
     }
 
@@ -114,7 +93,8 @@ impl Audio {
     }
 
     pub fn milliseconds_left_pad(&mut self, time_interval: f64) {
-        let ammount = Audio::milliseconds_to_samples(self.sampling_frequency, time_interval);
+        let sampling_frequency = self.sampling_frequency.unwrap_or(0.0);
+        let ammount = milliseconds_to_samples(sampling_frequency, time_interval);
         self.sample_left_pad(ammount);
     }
 
@@ -138,8 +118,8 @@ impl Audio {
     }
 
     pub fn split_at_time_ms(self, time_ms: f64) -> (Self, Self) {
-        let index = Self::milliseconds_to_samples(self.sampling_frequency, time_ms);
+        let sampling_frequency = self.sampling_frequency.unwrap_or(0.0);
+        let index = milliseconds_to_samples(sampling_frequency, time_ms);
         return self.split_at_sample_index(index);
     }
 }
-
