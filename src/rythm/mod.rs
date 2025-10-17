@@ -135,6 +135,22 @@ pub struct Rythm<T: Into<Audio>> {
     decay: Option<Decay>,
 }
 
+macro_rules! hit {
+    ($rythm: expr, $sound: expr, $relative_duration: expr, $($note: expr)?, $($duration: expr)?) => {{
+        let cloned = $sound.clone();
+        $rythm.hit($relative_duration, cloned);
+        //
+    }};
+}
+
+#[allow(dead_code)]
+fn test<T>(mut rythm: Rythm<T>, sound: T)
+where
+    T: Into<Audio> + Clone,
+{
+    hit!(rythm, sound, 0.5,,);
+}
+
 #[allow(dead_code)]
 impl<T: Into<Audio>> Rythm<T> {
     pub fn hit(&mut self, duration: f64, sound: T) {
@@ -187,7 +203,7 @@ impl<T: Into<Audio>> Rythm<T> {
     }
 }
 
-impl<T: Into<Audio>> Rythm<T> {}
+// impl<T: Into<Audio>> Rythm<T> {}
 
 #[allow(dead_code)]
 impl<T: Into<Audio> + Clone> Rythm<T> {
@@ -197,6 +213,14 @@ impl<T: Into<Audio> + Clone> Rythm<T> {
         for _ in 0..repetitions {
             self.rythm.extend(original.iter().cloned());
         }
+    }
+
+    pub fn len(&self) -> f64 {
+        self.rythm
+            .iter()
+            .map(|element| element.relative_duration())
+            .reduce(std::ops::Add::add)
+            .unwrap_or(0.0)
     }
 }
 
