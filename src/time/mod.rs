@@ -1,10 +1,13 @@
+use std::time::Duration;
+
 pub mod has_duration;
 use has_duration::HasDuration;
 pub mod has_sampling_frequency;
 use has_sampling_frequency::HasSamplingFrequency;
+pub mod sampling_frequency;
+// use sampling_frequency;
 
-#[allow(dead_code)]
-pub fn infer_number_of_samples<T>(variable: &T) -> usize
+pub fn infer_number_of_samples_1<T>(variable: &T) -> usize
 where
     T: HasDuration + HasSamplingFrequency,
 {
@@ -27,4 +30,8 @@ pub fn samples_to_seconds(sampling_frequency: f64, amount: usize) -> f64 {
 
 pub fn milliseconds_to_samples(sampling_frequency: f64, time_interval: f64) -> usize {
     return ((time_interval / 1000_f64) * sampling_frequency) as usize;
+}
+
+pub fn infer_number_of_samples(duration: Duration, sampling_frequency: f64) -> usize {
+    return (duration.as_secs_f64() * sampling_frequency) as usize;
 }

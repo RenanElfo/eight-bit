@@ -6,7 +6,7 @@ use builder_derive_macro::Setters;
 use crate::audio::{Audio, AudioBuilder};
 use crate::time::has_duration::HasDuration;
 use crate::time::has_sampling_frequency::HasSamplingFrequency;
-use crate::time::{infer_number_of_samples, samples_to_seconds};
+use crate::time::{infer_number_of_samples_1, samples_to_seconds};
 use crate::utils::build::Build;
 use crate::waves::traits::has_amplitude::HasAmplitude;
 use crate::waves::traits::has_phase::HasPhase;
@@ -108,7 +108,7 @@ impl Iterator for Pulse {
     type Item = f64;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.sample_index >= infer_number_of_samples(self) {
+        if self.sample_index >= infer_number_of_samples_1(self) {
             return None;
         }
         let frequency: f64 = self.tone.into();
