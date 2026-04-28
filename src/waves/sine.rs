@@ -5,6 +5,7 @@ use builder_derive_macro::Setters;
 
 use crate::audio::{Audio, AudioBuilder};
 use crate::time::has_sampling_frequency::HasSamplingFrequency;
+use crate::time::sampling_frequency::SamplingFrequency;
 use crate::time::{infer_number_of_samples, samples_to_seconds};
 use crate::utils::build::Build;
 use crate::waves::traits::has_amplitude::HasAmplitude;
@@ -22,7 +23,7 @@ pub struct SineBuilder {
     amplitude: f64,
     phase_rad: f64,
     duration: std::time::Duration,
-    sampling_frequency: f64,
+    sampling_frequency: SamplingFrequency,
     updater: UpdaterFunction,
 }
 
@@ -33,7 +34,7 @@ impl Default for SineBuilder {
             amplitude: 1.0,
             phase_rad: 0.0,
             duration: Duration::default(),
-            sampling_frequency: 44100_f64,
+            sampling_frequency: SamplingFrequency::new(44100_f64),
             updater: None,
         };
     }
@@ -66,7 +67,7 @@ pub struct Sine {
     amplitude: f64,
     phase_rad: f64,
     duration: Duration,
-    sampling_frequency: f64,
+    sampling_frequency: SamplingFrequency,
     sample_index: usize,
     updater: UpdaterFunction,
 }
@@ -81,12 +82,6 @@ impl Sine {
         }
         if self.phase_rad.is_infinite() || self.phase_rad.is_nan() {
             self.phase_rad = 0.0;
-        }
-        if self.sampling_frequency < 0.0
-            || self.sampling_frequency.is_infinite()
-            || self.sampling_frequency.is_nan()
-        {
-            self.sampling_frequency = 0.0;
         }
     }
 }
