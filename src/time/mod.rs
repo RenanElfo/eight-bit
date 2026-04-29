@@ -4,7 +4,7 @@ pub mod has_duration;
 use has_duration::HasDuration;
 pub mod has_sampling_frequency;
 use has_sampling_frequency::HasSamplingFrequency;
-pub mod sampling_frequency;
+pub mod frequency;
 // use sampling_frequency;
 
 pub fn infer_number_of_samples_1<T>(variable: &T) -> usize

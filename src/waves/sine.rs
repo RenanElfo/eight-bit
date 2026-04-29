@@ -4,8 +4,8 @@ use std::time::Duration;
 use builder_derive_macro::Setters;
 
 use crate::audio::{Audio, AudioBuilder};
+use crate::time::frequency::Frequency;
 use crate::time::has_sampling_frequency::HasSamplingFrequency;
-use crate::time::sampling_frequency::SamplingFrequency;
 use crate::time::{infer_number_of_samples, samples_to_seconds};
 use crate::utils::build::Build;
 use crate::waves::traits::has_amplitude::HasAmplitude;
@@ -23,7 +23,7 @@ pub struct SineBuilder {
     amplitude: f64,
     phase_rad: f64,
     duration: std::time::Duration,
-    sampling_frequency: SamplingFrequency,
+    sampling_frequency: Frequency,
     updater: UpdaterFunction,
 }
 
@@ -34,7 +34,7 @@ impl Default for SineBuilder {
             amplitude: 1.0,
             phase_rad: 0.0,
             duration: Duration::default(),
-            sampling_frequency: SamplingFrequency::new(44100_f64),
+            sampling_frequency: Frequency::new(44100_f64),
             updater: None,
         };
     }
@@ -67,7 +67,7 @@ pub struct Sine {
     amplitude: f64,
     phase_rad: f64,
     duration: Duration,
-    sampling_frequency: SamplingFrequency,
+    sampling_frequency: Frequency,
     sample_index: usize,
     updater: UpdaterFunction,
 }
